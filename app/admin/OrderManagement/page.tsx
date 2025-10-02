@@ -206,7 +206,7 @@ const OrderManagementPage = () => {
                     {order.status}
                   </span>
                 </p>
-                <p><strong>Total Amount:</strong> ${order.total_amount}</p>
+                <p><strong>Total Amount:</strong> ₹{order.total_amount}</p>
                 <p><strong>Payment Method:</strong> {order.payment_method}</p>
                 <p><strong>Payment Status:</strong> {order.payment_status}</p>
                 <p><strong>Created:</strong> {new Date(order.created_at).toLocaleDateString()}</p>
@@ -270,8 +270,8 @@ const OrderManagementPage = () => {
                       <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{item.size}</td>
                       <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{item.color}</td>
                       <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{item.quantity}</td>
-                      <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">${item.unit_price}</td>
-                      <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">${item.total_price}</td>
+                      <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">₹{item.unit_price}</td>
+                      <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">₹{item.total_price}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -354,7 +354,7 @@ const OrderManagementPage = () => {
                         <div className="text-sm text-gray-500">{order.user?.email || "N/A"}</div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${order.total_amount}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">₹{order.total_amount}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
                         order.status === 'approved' ? 'bg-green-100 text-green-800' :

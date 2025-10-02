@@ -104,6 +104,8 @@ function ProductFormContent() {
   const [uploadingImages, setUploadingImages] = useState(false);
   const [uploadingVideos, setUploadingVideos] = useState(false);
   const [failedImages, setFailedImages] = useState<Set<number>>(new Set());
+  const [sharedImageUrls, setSharedImageUrls] = useState<string[]>([]);
+  const [sharedVideoUrls, setSharedVideoUrls] = useState<string[]>([]);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -134,6 +136,8 @@ function ProductFormContent() {
 
   // File input refs
   const videoInputRef = useRef<HTMLInputElement>(null);
+  const sharedImageInputRef = useRef<HTMLInputElement>(null);
+  const sharedVideoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchInitialData();
@@ -622,6 +626,11 @@ function ProductFormContent() {
         newProductId = data.id;
       }
 
+      // Apply shared media to all variants before saving
+      if (sharedImageUrls.length > 0 || sharedVideoUrls.length > 0) {
+        applySharedMediaToAllVariants();
+      }
+
       // Handle variants
       if (newProductId) {
         console.log("Processing variants for product:", newProductId);
@@ -887,6 +896,52 @@ function ProductFormContent() {
 
       return newVariants;
     });
+  };
+
+  const applySharedMediaToAllVariants = () => {
+    setVariants((prev) =>
+      prev.map((variant) => ({
+        ...variant,
+        image_urls: Array.from(new Set([...(variant.image_urls || []), ...sharedImageUrls])),
+        video_urls: Array.from(new Set([...(variant.video_urls || []), ...sharedVideoUrls])),
+      }))
+    );
+  };
+
+  const handleSharedImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    setUploadingImages(true);
+    const urls: string[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const result = await uploadFile(file, "productsimages", "products");
+      if (result.error) {
+        alert(`Error uploading image: ${result.error}`);
+        continue;
+      }
+      urls.push(result.url);
+    }
+    setSharedImageUrls((prev) => Array.from(new Set([...prev, ...urls])));
+    setUploadingImages(false);
+  };
+
+  const handleSharedVideoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    setUploadingVideos(true);
+    const urls: string[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const result = await uploadFile(file, "productvideos", "productvideos");
+      if (result.error) {
+        alert(`Error uploading video: ${result.error}`);
+        continue;
+      }
+      urls.push(result.url);
+    }
+    setSharedVideoUrls((prev) => Array.from(new Set([...prev, ...urls])));
+    setUploadingVideos(false);
   };
 
   const updateVariant = (
@@ -1270,6 +1325,74 @@ function ProductFormContent() {
             <div className="grid grid-cols-1 gap-6">
               {/* Left Column */}
               <div className="space-y-4">
+                {/* Product Media - Upload once, reuse for all sizes */}
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-3">
+                    Product Media (shared across all sizes)
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3">
+                      <div className="w-80 flex-shrink-0">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Images</label>
+                        <div className="flex gap-2 items-start">
+                          <div className="flex gap-1 overflow-x-auto">
+                            {sharedImageUrls.map((url, idx) => (
+                              <div key={idx} className="relative flex-shrink-0">
+                                <img src={url} alt="Product" className="h-12 w-12 rounded object-cover border" />
+                              </div>
+                            ))}
+                            <label className="h-12 w-12 flex-shrink-0 flex items-center justify-center border-2 border-dashed border-gray-300 rounded text-gray-400 hover:border-[#F53F7A] hover:text-[#F53F7A] cursor-pointer">
+                              <input
+                                ref={sharedImageInputRef}
+                                type="file"
+                                accept="image/*"
+                                multiple
+                                onChange={handleSharedImageUpload}
+                                className="hidden"
+                              />
+                              {uploadingImages ? "..." : "+"}
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="w-80 flex-shrink-0">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Videos</label>
+                        <div className="flex gap-2 items-start">
+                          <div className="flex gap-1 overflow-x-auto">
+                            {sharedVideoUrls.map((url, idx) => (
+                              <div key={idx} className="relative flex-shrink-0">
+                                <video src={url} className="h-12 w-12 rounded object-cover border" controls />
+                              </div>
+                            ))}
+                            <label className="h-12 w-12 flex-shrink-0 flex items-center justify-center border-2 border-dashed border-gray-300 rounded text-gray-400 hover:border-[#F53F7A] hover:text-[#F53F7A] cursor-pointer">
+                              <input
+                                ref={sharedVideoInputRef}
+                                type="file"
+                                accept="video/*"
+                                multiple
+                                onChange={handleSharedVideoUpload}
+                                className="hidden"
+                              />
+                              {uploadingVideos ? "..." : "+"}
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <button
+                        type="button"
+                        onClick={applySharedMediaToAllVariants}
+                        className="px-3 py-2 bg-[#F53F7A] text-white text-sm rounded-lg hover:bg-[#F53F7A]/90"
+                      >
+                        Apply shared media to all variants
+                      </button>
+                      <p className="text-xs text-gray-500 mt-1">Uploads here are stored once and reused for every size (and color if selected).</p>
+                    </div>
+                  </div>
+                </div>
                 {/* Basic Information */}
                 <div>
                   <h3 className="text-lg font-medium text-gray-900 mb-3">
@@ -1709,7 +1832,7 @@ function ProductFormContent() {
                                     />
                                   </div>
 
-                                  {/* Variant Images */}
+                                  {/* Variant Images (display + per-variant optional upload) */}
                                   <div className="w-80 flex-shrink-0">
                                     <label className="block text-xs font-medium text-gray-700 mb-1">
                                       Images
@@ -1742,25 +1865,10 @@ function ProductFormContent() {
                                           {uploadingImages ? "..." : "+"}
                                         </label>
                                       </div>
-                                      <div className="flex gap-1 flex-1">
-                                        <input
-                                          type="url"
-                                          value={variantImageUrls[`${variant.color_id}-${variant.size_id}`] || ""}
-                                          onChange={(e) => setVariantImageUrls((prev) => ({ ...prev, [`${variant.color_id}-${variant.size_id}`]: e.target.value }))}
-                                          placeholder="Image URL"
-                                          className="flex-1 border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
-                                        />
-                                        <button
-                                          onClick={() => addVariantImageUrl(variant.color_id, variant.size_id)}
-                                          className="px-2 py-1 bg-[#F53F7A] text-white rounded hover:bg-[#F53F7A]/90 text-xs whitespace-nowrap"
-                                        >
-                                          Add
-                                        </button>
-                                      </div>
                                     </div>
                                   </div>
 
-                                  {/* Variant Videos */}
+                                  {/* Variant Videos (display + per-variant optional upload) */}
                                   <div className="w-80 flex-shrink-0">
                                     <label className="block text-xs font-medium text-gray-700 mb-1">
                                       Videos
@@ -1792,21 +1900,6 @@ function ProductFormContent() {
                                           />
                                           {uploadingVideos ? "..." : "+"}
                                         </label>
-                                      </div>
-                                      <div className="flex gap-1 flex-1">
-                                        <input
-                                          type="url"
-                                          value={variantVideoUrls[`${variant.color_id}-${variant.size_id}`] || ""}
-                                          onChange={(e) => setVariantVideoUrls((prev) => ({ ...prev, [`${variant.color_id}-${variant.size_id}`]: e.target.value }))}
-                                          placeholder="Video URL"
-                                          className="flex-1 border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
-                                        />
-                                        <button
-                                          onClick={() => addVariantVideoUrl(variant.color_id, variant.size_id)}
-                                          className="px-2 py-1 bg-[#F53F7A] text-white rounded hover:bg-[#F53F7A]/90 text-xs whitespace-nowrap"
-                                        >
-                                          Add
-                                        </button>
                                       </div>
                                     </div>
                                   </div>
