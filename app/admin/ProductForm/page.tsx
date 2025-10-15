@@ -104,8 +104,22 @@ function ProductFormContent() {
   const [uploadingImages, setUploadingImages] = useState(false);
   const [uploadingVideos, setUploadingVideos] = useState(false);
   const [failedImages, setFailedImages] = useState<Set<number>>(new Set());
-  const [sharedImageUrls, setSharedImageUrls] = useState<string[]>([]);
-  const [sharedVideoUrls, setSharedVideoUrls] = useState<string[]>([]);
+  
+  // Enhanced media management with size assignments
+  type MediaWithSizes = {
+    url: string;
+    assignedSizes: string[]; // Array of size IDs
+  };
+  const [mediaLibrary, setMediaLibrary] = useState<{
+    images: MediaWithSizes[];
+    videos: MediaWithSizes[];
+  }>({ images: [], videos: [] });
+  
+  // Modal state for size selection
+  const [showSizeSelectionModal, setShowSizeSelectionModal] = useState(false);
+  const [pendingMediaUrls, setPendingMediaUrls] = useState<string[]>([]);
+  const [pendingMediaType, setPendingMediaType] = useState<'image' | 'video'>('image');
+  const [selectedSizesForMedia, setSelectedSizesForMedia] = useState<string[]>([]);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -898,12 +912,122 @@ function ProductFormContent() {
     });
   };
 
-  const applySharedMediaToAllVariants = () => {
+  // Apply media to selected sizes only
+  const applyMediaToSelectedSizes = () => {
+    if (selectedSizesForMedia.length === 0) {
+      alert('Please select at least one size');
+      return;
+    }
+
+    // Add the pending media to the media library with size assignments
+    if (pendingMediaType === 'image') {
+      setMediaLibrary((prev) => ({
+        ...prev,
+        images: [
+          ...prev.images,
+          ...pendingMediaUrls.map(url => ({
+            url,
+            assignedSizes: [...selectedSizesForMedia],
+          }))
+        ],
+      }));
+    } else {
+      setMediaLibrary((prev) => ({
+        ...prev,
+        videos: [
+          ...prev.videos,
+          ...pendingMediaUrls.map(url => ({
+            url,
+            assignedSizes: [...selectedSizesForMedia],
+          }))
+        ],
+      }));
+    }
+
+    // Add selected sizes to selectedSizes if not already there
+    const newSizesToAdd = selectedSizesForMedia.filter(sizeId => !selectedSizes.includes(sizeId));
+    if (newSizesToAdd.length > 0) {
+      setSelectedSizes(prev => [...prev, ...newSizesToAdd]);
+    }
+
+    // Apply media to existing variants with matching sizes, or create new variants
+    setVariants((prev) => {
+      const updatedVariants = [...prev];
+      
+      selectedSizesForMedia.forEach(sizeId => {
+        // Check if variants exist for this size
+        const existingVariants = updatedVariants.filter(v => v.size_id === sizeId);
+        
+        if (existingVariants.length > 0) {
+          // Update existing variants
+          existingVariants.forEach(variant => {
+            const index = updatedVariants.indexOf(variant);
+            if (pendingMediaType === 'image') {
+              updatedVariants[index] = {
+                ...variant,
+                image_urls: Array.from(new Set([...(variant.image_urls || []), ...pendingMediaUrls])),
+              };
+            } else {
+              updatedVariants[index] = {
+                ...variant,
+                video_urls: Array.from(new Set([...(variant.video_urls || []), ...pendingMediaUrls])),
+              };
+            }
+          });
+        } else {
+          // Create new variant for this size (no color)
+          const newVariant: Variant = {
+            color_id: null,
+            size_id: sizeId,
+            quantity: 0,
+            price: 0,
+            sku: "",
+            mrp_price: 0,
+            rsp_price: 0,
+            cost_price: 0,
+            discount_percentage: 0,
+            image_urls: pendingMediaType === 'image' ? [...pendingMediaUrls] : [],
+            video_urls: pendingMediaType === 'video' ? [...pendingMediaUrls] : [],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+          updatedVariants.push(newVariant);
+        }
+      });
+      
+      return updatedVariants;
+    });
+
+    // Reset and close modal
+    setPendingMediaUrls([]);
+    setSelectedSizesForMedia([]);
+    setShowSizeSelectionModal(false);
+  };
+
+  // Remove media from library and variants
+  const removeMediaFromLibrary = (mediaUrl: string, mediaType: 'image' | 'video') => {
+    if (mediaType === 'image') {
+      setMediaLibrary((prev) => ({
+        ...prev,
+        images: prev.images.filter(m => m.url !== mediaUrl),
+      }));
+    } else {
+      setMediaLibrary((prev) => ({
+        ...prev,
+        videos: prev.videos.filter(m => m.url !== mediaUrl),
+      }));
+    }
+
+    // Remove from all variants
     setVariants((prev) =>
       prev.map((variant) => ({
         ...variant,
-        image_urls: Array.from(new Set([...(variant.image_urls || []), ...sharedImageUrls])),
-        video_urls: Array.from(new Set([...(variant.video_urls || []), ...sharedVideoUrls])),
+        image_urls: mediaType === 'image' 
+          ? variant.image_urls.filter(url => url !== mediaUrl)
+          : variant.image_urls,
+        video_urls: mediaType === 'video'
+          ? variant.video_urls.filter(url => url !== mediaUrl)
+          : variant.video_urls,
       }))
     );
   };
@@ -911,6 +1035,7 @@ function ProductFormContent() {
   const handleSharedImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
+    
     setUploadingImages(true);
     const urls: string[] = [];
     for (let i = 0; i < files.length; i++) {
@@ -922,13 +1047,24 @@ function ProductFormContent() {
       }
       urls.push(result.url);
     }
-    setSharedImageUrls((prev) => Array.from(new Set([...prev, ...urls])));
     setUploadingImages(false);
+
+    if (urls.length > 0) {
+      // Show modal to select sizes
+      setPendingMediaUrls(urls);
+      setPendingMediaType('image');
+      setSelectedSizesForMedia([]); // Reset selection
+      setShowSizeSelectionModal(true);
+    }
+    
+    // Reset file input
+    event.target.value = '';
   };
 
   const handleSharedVideoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
+    
     setUploadingVideos(true);
     const urls: string[] = [];
     for (let i = 0; i < files.length; i++) {
@@ -940,8 +1076,18 @@ function ProductFormContent() {
       }
       urls.push(result.url);
     }
-    setSharedVideoUrls((prev) => Array.from(new Set([...prev, ...urls])));
     setUploadingVideos(false);
+
+    if (urls.length > 0) {
+      // Show modal to select sizes
+      setPendingMediaUrls(urls);
+      setPendingMediaType('video');
+      setSelectedSizesForMedia([]); // Reset selection
+      setShowSizeSelectionModal(true);
+    }
+    
+    // Reset file input
+    event.target.value = '';
   };
 
   const updateVariant = (
@@ -1325,73 +1471,136 @@ function ProductFormContent() {
             <div className="grid grid-cols-1 gap-6">
               {/* Left Column */}
               <div className="space-y-4">
-                {/* Product Media - Upload once, reuse for all sizes */}
+                {/* Product Media - Upload and assign to specific sizes */}
                 <div>
                   <h3 className="text-lg font-medium text-gray-900 mb-3">
-                    Product Media (shared across all sizes)
+                    Product Media Library
                   </h3>
-                  <div className="space-y-3">
-                    <div className="flex items-start gap-3">
-                      <div className="w-80 flex-shrink-0">
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Images</label>
-                        <div className="flex gap-2 items-start">
-                          <div className="flex gap-1 overflow-x-auto">
-                            {sharedImageUrls.map((url, idx) => (
-                              <div key={idx} className="relative flex-shrink-0">
-                                <img src={url} alt="Product" className="h-12 w-12 rounded object-cover border" />
-                              </div>
-                            ))}
-                            <label className="h-12 w-12 flex-shrink-0 flex items-center justify-center border-2 border-dashed border-gray-300 rounded text-gray-400 hover:border-[#F53F7A] hover:text-[#F53F7A] cursor-pointer">
-                              <input
-                                ref={sharedImageInputRef}
-                                type="file"
-                                accept="image/*"
-                                multiple
-                                onChange={handleSharedImageUpload}
-                                className="hidden"
-                              />
-                              {uploadingImages ? "..." : "+"}
-                            </label>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <div className="w-80 flex-shrink-0">
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Videos</label>
-                        <div className="flex gap-2 items-start">
-                          <div className="flex gap-1 overflow-x-auto">
-                            {sharedVideoUrls.map((url, idx) => (
-                              <div key={idx} className="relative flex-shrink-0">
-                                <video src={url} className="h-12 w-12 rounded object-cover border" controls />
-                              </div>
-                            ))}
-                            <label className="h-12 w-12 flex-shrink-0 flex items-center justify-center border-2 border-dashed border-gray-300 rounded text-gray-400 hover:border-[#F53F7A] hover:text-[#F53F7A] cursor-pointer">
-                              <input
-                                ref={sharedVideoInputRef}
-                                type="file"
-                                accept="video/*"
-                                multiple
-                                onChange={handleSharedVideoUpload}
-                                className="hidden"
-                              />
-                              {uploadingVideos ? "..." : "+"}
-                            </label>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div>
-                      <button
-                        type="button"
-                        onClick={applySharedMediaToAllVariants}
-                        className="px-3 py-2 bg-[#F53F7A] text-white text-sm rounded-lg hover:bg-[#F53F7A]/90"
-                      >
-                        Apply shared media to all variants
-                      </button>
-                      <p className="text-xs text-gray-500 mt-1">Uploads here are stored once and reused for every size (and color if selected).</p>
-                    </div>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Upload images and videos, then select which sizes should use them. All available sizes will be shown for selection.
+                  </p>
+                  
+                  {/* Upload Buttons */}
+                  <div className="flex gap-3 mb-4">
+                    <label className="flex items-center gap-2 px-4 py-2 bg-[#F53F7A] text-white rounded-lg hover:bg-[#F53F7A]/90 cursor-pointer transition-colors">
+                      <input
+                        ref={sharedImageInputRef}
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={handleSharedImageUpload}
+                        className="hidden"
+                      />
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      {uploadingImages ? 'Uploading...' : 'Upload Images'}
+                    </label>
+                    
+                    <label className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 cursor-pointer transition-colors">
+                      <input
+                        ref={sharedVideoInputRef}
+                        type="file"
+                        accept="video/*"
+                        multiple
+                        onChange={handleSharedVideoUpload}
+                        className="hidden"
+                      />
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                      {uploadingVideos ? 'Uploading...' : 'Upload Videos'}
+                    </label>
                   </div>
+
+                  {/* Media Library Display */}
+                  {(mediaLibrary.images.length > 0 || mediaLibrary.videos.length > 0) && (
+                    <div className="space-y-4 border border-gray-200 rounded-lg p-4 bg-gray-50">
+                      {/* Images Section */}
+                      {mediaLibrary.images.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-semibold text-gray-700 mb-2">Images in Library</h4>
+                          <div className="space-y-2">
+                            {mediaLibrary.images.map((media, idx) => (
+                              <div key={idx} className="flex items-center gap-3 bg-white p-2 rounded border border-gray-200">
+                                <img src={media.url} alt="Product" className="h-16 w-16 rounded object-cover border" />
+                                <div className="flex-1">
+                                  <p className="text-xs font-medium text-gray-700">Assigned to sizes:</p>
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {media.assignedSizes.map((sizeId) => {
+                                      const size = sizes.find(s => s.id === sizeId);
+                                      return (
+                                        <span key={sizeId} className="px-2 py-0.5 bg-[#F53F7A] text-white text-xs rounded">
+                                          {size?.name || sizeId}
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => removeMediaFromLibrary(media.url, 'image')}
+                                  className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                  title="Remove from library"
+                                >
+                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Videos Section */}
+                      {mediaLibrary.videos.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-semibold text-gray-700 mb-2">Videos in Library</h4>
+                          <div className="space-y-2">
+                            {mediaLibrary.videos.map((media, idx) => (
+                              <div key={idx} className="flex items-center gap-3 bg-white p-2 rounded border border-gray-200">
+                                <video src={media.url} className="h-16 w-16 rounded object-cover border" controls />
+                                <div className="flex-1">
+                                  <p className="text-xs font-medium text-gray-700">Assigned to sizes:</p>
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {media.assignedSizes.map((sizeId) => {
+                                      const size = sizes.find(s => s.id === sizeId);
+                                      return (
+                                        <span key={sizeId} className="px-2 py-0.5 bg-purple-600 text-white text-xs rounded">
+                                          {size?.name || sizeId}
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => removeMediaFromLibrary(media.url, 'video')}
+                                  className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                  title="Remove from library"
+                                >
+                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {(mediaLibrary.images.length === 0 && mediaLibrary.videos.length === 0) && (
+                    <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
+                      <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <p className="mt-2 text-sm text-gray-500">No media uploaded yet</p>
+                      <p className="text-xs text-gray-400 mt-1">Upload images or videos and assign them to specific sizes</p>
+                    </div>
+                  )}
                 </div>
                 {/* Basic Information */}
                 <div>
@@ -2214,6 +2423,171 @@ function ProductFormContent() {
           </div>
         </div>
       </div>
+
+      {/* Size Selection Modal */}
+      {showSizeSelectionModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-[#F53F7A] to-[#F53F7A]/90 px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold text-white">
+                    Select Sizes for {pendingMediaType === 'image' ? 'Images' : 'Videos'}
+                  </h2>
+                  <p className="text-sm text-white/80 mt-1">
+                    {pendingMediaUrls.length} {pendingMediaType === 'image' ? 'image' : 'video'}(s) uploaded
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowSizeSelectionModal(false);
+                    setPendingMediaUrls([]);
+                    setSelectedSizesForMedia([]);
+                  }}
+                  className="text-white/80 hover:text-white p-1 rounded-full hover:bg-white/20 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6">
+              {/* Media Preview */}
+              <div className="mb-6">
+                <p className="text-sm font-medium text-gray-700 mb-3">Media to assign:</p>
+                <div className="flex gap-2 overflow-x-auto pb-2">
+                  {pendingMediaUrls.map((url, idx) => (
+                    <div key={idx} className="flex-shrink-0">
+                      {pendingMediaType === 'image' ? (
+                        <img src={url} alt="Preview" className="h-20 w-20 rounded object-cover border-2 border-[#F53F7A]" />
+                      ) : (
+                        <video src={url} className="h-20 w-20 rounded object-cover border-2 border-purple-600" controls />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Size Selection */}
+              <div>
+                <p className="text-sm font-medium text-gray-700 mb-3">
+                  Select which sizes should use this media:
+                </p>
+                
+                {/* Select All / Deselect All */}
+                <div className="flex gap-2 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const availableSizes = formData.category_id 
+                        ? sizes.filter(s => s.category_id === formData.category_id).map(s => s.id)
+                        : sizes.map(s => s.id);
+                      setSelectedSizesForMedia(availableSizes);
+                    }}
+                    className="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                  >
+                    Select All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSizesForMedia([])}
+                    className="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                  >
+                    Deselect All
+                  </button>
+                </div>
+
+                {/* Size Checkboxes */}
+                <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-200 rounded-lg p-3 bg-gray-50">
+                  {sizes.length === 0 ? (
+                    <div className="text-center py-4 text-sm text-gray-500">
+                      No sizes available. Please add sizes in the system first.
+                    </div>
+                  ) : (
+                    sizes
+                      .filter(size => !formData.category_id || size.category_id === formData.category_id)
+                      .map((size) => {
+                        const isSelected = selectedSizesForMedia.includes(size.id);
+                        
+                        return (
+                          <label
+                            key={size.id}
+                            className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all ${
+                              isSelected
+                                ? 'bg-[#F53F7A] text-white'
+                                : 'bg-white hover:bg-gray-50'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedSizesForMedia([...selectedSizesForMedia, size.id]);
+                                } else {
+                                  setSelectedSizesForMedia(selectedSizesForMedia.filter(id => id !== size.id));
+                                }
+                              }}
+                              className="h-5 w-5 rounded border-gray-300 text-[#F53F7A] focus:ring-[#F53F7A]"
+                            />
+                            <span className="font-medium">{size.name}</span>
+                            {selectedColors.length > 0 && (
+                              <span className={`text-xs ${isSelected ? 'text-white/80' : 'text-gray-500'}`}>
+                                (All colors)
+                              </span>
+                            )}
+                          </label>
+                        );
+                      })
+                  )}
+                </div>
+              </div>
+
+              {/* Selection Summary */}
+              {selectedSizesForMedia.length > 0 && (
+                <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <p className="text-sm text-green-800">
+                    <span className="font-semibold">{selectedSizesForMedia.length}</span> size(s) selected
+                  </p>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-6 mt-6 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSizeSelectionModal(false);
+                    setPendingMediaUrls([]);
+                    setSelectedSizesForMedia([]);
+                  }}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={applyMediaToSelectedSizes}
+                  disabled={selectedSizesForMedia.length === 0}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-[#F53F7A] hover:bg-[#F53F7A]/90 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Assign to Selected Sizes
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add Color Modal */}
       {showAddColorModal && (

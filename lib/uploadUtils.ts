@@ -1,13 +1,21 @@
-import { supabase } from './supabase';
-
+/**
+ * Upload file to Cloudinary via API route
+ * @param file - The file to upload
+ * @param folder - The folder name in Cloudinary (e.g., 'products', 'avatars')
+ * @param resourceType - The resource type ('image', 'video', or 'auto')
+ * @returns Object containing the URL and any error
+ */
 export const uploadFile = async (
   file: File,
-  bucket: string,
-  path: string
-): Promise<{ url: string; error: string | null }> => {
+  folder: string = 'only2u',
+  resourceType: string = 'auto'
+): Promise<{ url: string; error: string | null; public_id?: string }> => {
   try {
     // Validate file size (max 10MB for images, 100MB for videos)
-    const maxSize = file.type.startsWith('video/') ? 100 * 1024 * 1024 : 10 * 1024 * 1024;
+    const maxSize = file.type.startsWith('video/') 
+      ? 100 * 1024 * 1024 
+      : 10 * 1024 * 1024;
+    
     if (file.size > maxSize) {
       return {
         url: '',
@@ -16,74 +24,82 @@ export const uploadFile = async (
     }
 
     // Validate file type
-    const allowedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    const allowedVideoTypes = ['video/mp4', 'video/webm', 'video/ogg'];
+    const allowedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+    const allowedVideoTypes = ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime'];
     const allowedTypes = [...allowedImageTypes, ...allowedVideoTypes];
     
     if (!allowedTypes.includes(file.type)) {
       return {
         url: '',
-        error: 'Invalid file type. Only JPEG, PNG, WebP images and MP4, WebM, OGG videos are allowed.'
+        error: 'Invalid file type. Only JPEG, PNG, WebP, GIF images and MP4, WebM, OGG, MOV videos are allowed.'
       };
     }
 
-    // Generate unique filename
-    const timestamp = Date.now();
-    const fileExtension = file.name.split('.').pop();
-    const fileName = `${timestamp}_${Math.random().toString(36).substring(2)}.${fileExtension}`;
-    const filePath = `${path}/${fileName}`;
+    // Create form data
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('folder', folder);
+    formData.append('resourceType', resourceType);
 
-    // Upload file to Supabase storage
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: false
-      });
+    // Upload to Cloudinary via API route
+    const response = await fetch('/api/upload/cloudinary', {
+      method: 'POST',
+      body: formData,
+    });
 
-    if (error) {
-      console.error('Upload error:', error);
+    const result = await response.json();
+
+    if (!response.ok) {
+      console.error('Upload error:', result.error);
       return {
         url: '',
-        error: error.message
+        error: result.error || 'Failed to upload file'
       };
     }
 
-    // Get public URL
-    const { data: urlData } = supabase.storage
-      .from(bucket)
-      .getPublicUrl(filePath);
-
     return {
-      url: urlData.publicUrl,
+      url: result.url,
+      public_id: result.public_id,
       error: null
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Upload error:', error);
     return {
       url: '',
-      error: 'Failed to upload file'
+      error: error.message || 'Failed to upload file'
     };
   }
 };
 
+/**
+ * Delete file from Cloudinary via API route
+ * @param public_id - The Cloudinary public ID of the file
+ * @param resourceType - The resource type ('image' or 'video')
+ * @returns Object containing any error
+ */
 export const deleteFile = async (
-  bucket: string,
-  path: string
+  public_id: string,
+  resourceType: 'image' | 'video' = 'image'
 ): Promise<{ error: string | null }> => {
   try {
-    const { error } = await supabase.storage
-      .from(bucket)
-      .remove([path]);
+    const response = await fetch('/api/upload/cloudinary', {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ public_id, resource_type: resourceType }),
+    });
 
-    if (error) {
-      console.error('Delete error:', error);
-      return { error: error.message };
+    const result = await response.json();
+
+    if (!response.ok) {
+      console.error('Delete error:', result.error);
+      return { error: result.error || 'Failed to delete file' };
     }
 
     return { error: null };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Delete error:', error);
-    return { error: 'Failed to delete file' };
+    return { error: error.message || 'Failed to delete file' };
   }
 }; 

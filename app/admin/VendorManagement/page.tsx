@@ -77,11 +77,26 @@ const VendorManagement = () => {
   };
 
   const handleDeleteVendor = async (vendor: Vendor) => {
-    if (typeof window !== 'undefined' && !window.confirm(`Delete vendor "${vendor.name}"?`)) return;
-    setSubmitting(true);
-    const { error } = await supabase.from("users").delete().eq("id", vendor.id);
-    setSubmitting(false);
-    if (!error) fetchVendors();
+    if (typeof window !== 'undefined' && !window.confirm(`Delete vendor "${vendor.name}"? This action cannot be undone.`)) return;
+    
+    try {
+      setSubmitting(true);
+      const { error } = await supabase.from("users").delete().eq("id", vendor.id);
+      
+      if (error) {
+        console.error("Error deleting vendor:", error);
+        alert("Error deleting vendor");
+        return;
+      }
+      
+      setVendors(prev => prev.filter(v => v.id !== vendor.id));
+      alert("Vendor deleted successfully");
+    } catch (error) {
+      console.error("Error:", error);
+      alert("An error occurred while deleting vendor");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -342,7 +357,9 @@ const VendorManagement = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
-                  <label className="block text-sm font-medium text-gray-800 mb-1">Name</label>
+                  <label className="block text-sm font-medium text-gray-800 mb-1">
+                    Name <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="text"
                     value={formData.name}
@@ -352,29 +369,27 @@ const VendorManagement = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-800 mb-1">Email</label>
+                  <label className="block text-sm font-medium text-gray-800 mb-1">Email (Optional)</label>
                   <input
                     type="email"
                     value={formData.email}
                     onChange={e => setFormData({ ...formData, email: e.target.value })}
-                    required
                     className="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm focus:ring-2 focus:ring-[#F53F7A] focus:outline-none"
                   />
                 </div>
                 {!editingVendor && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-800 mb-1">Password</label>
+                    <label className="block text-sm font-medium text-gray-800 mb-1">Password (Optional)</label>
                     <input
                       type="password"
                       value={formData.password}
                       onChange={e => setFormData({ ...formData, password: e.target.value })}
-                      required
                       className="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm focus:ring-2 focus:ring-[#F53F7A] focus:outline-none"
                     />
                   </div>
                 )}
                 <div>
-                  <label className="block text-sm font-medium text-gray-800 mb-1">Location</label>
+                  <label className="block text-sm font-medium text-gray-800 mb-1">Location (Optional)</label>
                   <input
                     type="text"
                     value={formData.location}
@@ -383,12 +398,11 @@ const VendorManagement = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-800 mb-1">Phone</label>
+                  <label className="block text-sm font-medium text-gray-800 mb-1">Phone (Optional)</label>
                   <input
                     type="tel"
                     value={formData.phone}
                     onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                    required
                     className="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm focus:ring-2 focus:ring-[#F53F7A] focus:outline-none"
                   />
                 </div>

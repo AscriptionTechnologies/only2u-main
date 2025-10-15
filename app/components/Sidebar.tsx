@@ -14,7 +14,8 @@ import {
   LogOut,
   X,
   Palette,
-  Package
+  Package,
+  MessageCircle
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import Logo from "./Logo";
@@ -38,7 +39,6 @@ const Sidebar = () => {
       link: "/admin/OrderManagement",
       path: "OrderManagement",
     },
-
     {
       name: "Inventory Management",
       icon: Contact,
@@ -56,6 +56,12 @@ const Sidebar = () => {
       icon: UserPlus,
       link: "/admin/VendorManagement",
       path: "VendorManagement",
+    },
+    {
+      name: "Vendor Q&A",
+      icon: MessageCircle,
+      link: "/admin/VendorQA",
+      path: "VendorQA",
     },
   ];
 
