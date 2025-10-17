@@ -35,11 +35,11 @@ export const uploadFile = async (
       };
     }
 
-    // For large files (videos > 10MB), upload directly to Cloudinary
-    // This bypasses Vercel's body size limits
-    const isLargeFile = file.size > 10 * 1024 * 1024;
+    // For videos larger than 5MB, upload directly to Cloudinary
+    // This bypasses Vercel's body size limits (Vercel has ~4.5MB limit)
+    const isLargeVideo = file.type.startsWith('video/') && file.size > 5 * 1024 * 1024;
     
-    if (isLargeFile && file.type.startsWith('video/')) {
+    if (isLargeVideo) {
       // Direct upload to Cloudinary (unsigned upload)
       const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
       const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || 'ml_default';
