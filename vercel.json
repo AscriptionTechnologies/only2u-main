@@ -1,0 +1,15 @@
+{
+  "functions": {
+    "app/api/upload/cloudinary/route.ts": {
+      "maxDuration": 60,
+      "memory": 1024
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/upload/cloudinary",
+      "destination": "/api/upload/cloudinary"
+    }
+  ]
+}
+

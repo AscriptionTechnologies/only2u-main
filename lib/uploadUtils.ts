@@ -1,5 +1,5 @@
 /**
- * Upload file to Cloudinary via API route
+ * Upload file to Cloudinary via API route or direct upload
  * @param file - The file to upload
  * @param folder - The folder name in Cloudinary (e.g., 'products', 'avatars')
  * @param resourceType - The resource type ('image', 'video', or 'auto')
@@ -35,7 +35,53 @@ export const uploadFile = async (
       };
     }
 
-    // Create form data
+    // For large files (videos > 10MB), upload directly to Cloudinary
+    // This bypasses Vercel's body size limits
+    const isLargeFile = file.size > 10 * 1024 * 1024;
+    
+    if (isLargeFile && file.type.startsWith('video/')) {
+      // Direct upload to Cloudinary (unsigned upload)
+      const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+      const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || 'ml_default';
+      
+      if (!cloudName) {
+        return {
+          url: '',
+          error: 'Cloudinary configuration missing'
+        };
+      }
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('upload_preset', uploadPreset);
+      formData.append('folder', folder);
+      
+      const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${cloudName}/video/upload`;
+      
+      const response = await fetch(cloudinaryUrl, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        console.error('Direct Cloudinary upload error:', error);
+        return {
+          url: '',
+          error: 'Failed to upload video directly to Cloudinary'
+        };
+      }
+
+      const result = await response.json();
+      
+      return {
+        url: result.secure_url,
+        public_id: result.public_id,
+        error: null
+      };
+    }
+
+    // For smaller files, use our API route
     const formData = new FormData();
     formData.append('file', file);
     formData.append('folder', folder);
@@ -47,7 +93,30 @@ export const uploadFile = async (
       body: formData,
     });
 
-    const result = await response.json();
+    // Check if response is JSON
+    const contentType = response.headers.get('content-type');
+    let result;
+    
+    if (contentType && contentType.includes('application/json')) {
+      result = await response.json();
+    } else {
+      // If not JSON, it's likely an error page or text response
+      const text = await response.text();
+      console.error('Non-JSON response from upload API:', text.substring(0, 200));
+      
+      // Check for common error patterns
+      if (text.includes('Request Entity Too Large') || text.includes('413')) {
+        return {
+          url: '',
+          error: 'File size too large for upload. Please try a smaller file or compress the video.'
+        };
+      }
+      
+      return {
+        url: '',
+        error: 'Upload failed: Server returned an invalid response. Please check your file size and format.'
+      };
+    }
 
     if (!response.ok) {
       console.error('Upload error:', result.error);
