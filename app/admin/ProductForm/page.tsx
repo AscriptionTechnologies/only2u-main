@@ -88,6 +88,8 @@ type Review = {
   date: string;
   is_verified: boolean;
   profile_image_url?: string;
+  review_images?: string[]; // Optional review media images
+  review_videos?: string[]; // Optional review media videos
 };
 
 function ProductFormContent() {
@@ -281,7 +283,9 @@ function ProductFormContent() {
             comment,
             date,
             is_verified,
-            profile_image_url
+            profile_image_url,
+            review_images,
+            review_videos
           )
         `
         )
@@ -640,11 +644,6 @@ function ProductFormContent() {
         newProductId = data.id;
       }
 
-      // Apply shared media to all variants before saving
-      if (sharedImageUrls.length > 0 || sharedVideoUrls.length > 0) {
-        applySharedMediaToAllVariants();
-      }
-
       // Handle variants
       if (newProductId) {
         console.log("Processing variants for product:", newProductId);
@@ -776,6 +775,9 @@ function ProductFormContent() {
 
       // Handle reviews
       if (newProductId && reviews.length > 0) {
+        console.log("[Save Reviews] Starting to save reviews. Total reviews:", reviews.length);
+        console.log("[Save Reviews] Reviews data:", reviews);
+        
         // Delete existing reviews
         await supabase
           .from("product_reviews")
@@ -791,13 +793,20 @@ function ProductFormContent() {
           date: review.date,
           is_verified: review.is_verified,
           profile_image_url: review.profile_image_url,
+          review_images: review.review_images || [],
+          review_videos: review.review_videos || [],
         }));
+
+        console.log("[Save Reviews] Prepared review data for Supabase insert:", reviewData);
 
         const { error: reviewError } = await supabase
           .from("product_reviews")
           .insert(reviewData);
         if (reviewError) {
-          console.error("Error saving reviews:", reviewError);
+          console.error("[Save Reviews] Error saving reviews:", reviewError);
+          alert(`Error saving reviews: ${reviewError.message}`);
+        } else {
+          console.log("[Save Reviews] Successfully saved all reviews!");
         }
       }
 
@@ -1287,8 +1296,115 @@ function ProductFormContent() {
       date: new Date().toISOString().split("T")[0],
       is_verified: false,
       profile_image_url: "",
+      review_images: [],
+      review_videos: [],
     };
     setReviews([...reviews, newReview]);
+    setShowReviewsSection(true); // Auto-expand reviews section when adding
+  };
+
+  // Bulk upload reviews from CSV/Excel
+  const handleBulkReviewUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target?.result as string;
+        const lines = text.split('\n').filter(line => line.trim());
+        
+        if (lines.length === 0) {
+          alert('File is empty');
+          return;
+        }
+
+        // Parse header
+        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+        const nameIndex = headers.findIndex(h => h === 'name' || h === 'reviewer_name' || h === 'reviewer name');
+        const ratingIndex = headers.findIndex(h => h === 'rating');
+        const commentIndex = headers.findIndex(h => h === 'comment' || h === 'review');
+        const dateIndex = headers.findIndex(h => h === 'date' || h === 'review_date' || h === 'review date');
+        const verifiedIndex = headers.findIndex(h => h === 'verified' || h === 'is_verified');
+
+        if (nameIndex === -1 || ratingIndex === -1) {
+          alert('CSV must have "name" and "rating" columns');
+          return;
+        }
+
+        const newReviews: Review[] = [];
+        const errors: string[] = [];
+
+        // Parse data rows (skip header)
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+
+          const columns = line.split(',').map(c => c.trim());
+          
+          const name = columns[nameIndex]?.replace(/^["']|["']$/g, '') || '';
+          const ratingStr = columns[ratingIndex]?.replace(/^["']|["']$/g, '') || '';
+          const rating = parseFloat(ratingStr);
+
+          // Validate mandatory fields
+          if (!name) {
+            errors.push(`Row ${i + 1}: Name is required`);
+            continue;
+          }
+
+          if (isNaN(rating) || rating < 1 || rating > 5) {
+            errors.push(`Row ${i + 1}: Rating must be a number between 1 and 5`);
+            continue;
+          }
+
+          // Optional fields
+          const comment = commentIndex !== -1 ? (columns[commentIndex]?.replace(/^["']|["']$/g, '') || '') : '';
+          const dateStr = dateIndex !== -1 ? (columns[dateIndex]?.replace(/^["']|["']$/g, '') || '') : '';
+          const verifiedStr = verifiedIndex !== -1 ? (columns[verifiedIndex]?.replace(/^["']|["']$/g, '').toLowerCase() || 'false') : 'false';
+          
+          // Parse date or use current date
+          let reviewDate = new Date().toISOString().split("T")[0];
+          if (dateStr) {
+            const parsedDate = new Date(dateStr);
+            if (!isNaN(parsedDate.getTime())) {
+              reviewDate = parsedDate.toISOString().split("T")[0];
+            }
+          }
+
+          // Parse verified status
+          const isVerified = verifiedStr === 'true' || verifiedStr === 'yes' || verifiedStr === '1';
+
+          newReviews.push({
+            reviewer_name: name,
+            rating: Math.round(rating),
+            comment: comment,
+            date: reviewDate,
+            is_verified: isVerified,
+            profile_image_url: '',
+            review_images: [],
+            review_videos: [],
+          });
+        }
+
+        if (errors.length > 0) {
+          alert(`Imported ${newReviews.length} reviews with ${errors.length} errors:\n\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? '\n...' : ''}`);
+        } else {
+          alert(`Successfully imported ${newReviews.length} reviews!`);
+        }
+
+        if (newReviews.length > 0) {
+          setReviews([...reviews, ...newReviews]);
+          setShowReviewsSection(true);
+        }
+      } catch (error) {
+        console.error('Error parsing CSV:', error);
+        alert('Error parsing CSV file. Please make sure it\'s properly formatted.');
+      }
+    };
+
+    reader.readAsText(file);
+    // Reset file input
+    event.target.value = '';
   };
 
   const updateReview = (index: number, field: keyof Review, value: any) => {
@@ -1347,6 +1463,126 @@ function ProductFormContent() {
     setReviews((prev) =>
       prev.map((review, i) =>
         i === index ? { ...review, profile_image_url: "" } : review
+      )
+    );
+  };
+
+  // Handle review media uploads (images)
+  const handleReviewMediaImageUpload = async (
+    index: number,
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    console.log(`[Review Image Upload] Starting upload for review #${index}, ${files.length} file(s)`);
+    setUploadingReviewImages(true);
+    const uploadedUrls: string[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      console.log(`[Review Image Upload] Uploading file ${i + 1}/${files.length}: ${file.name}`);
+      const result = await uploadFile(file, "reviewmedia", "reviews");
+      
+      if (result.error) {
+        console.error(`[Review Image Upload] Error uploading ${file.name}:`, result.error);
+        alert(`Error uploading ${file.name}: ${result.error}`);
+        continue;
+      }
+      
+      console.log(`[Review Image Upload] Successfully uploaded ${file.name}, URL:`, result.url);
+      uploadedUrls.push(result.url);
+    }
+
+    console.log(`[Review Image Upload] Total uploaded URLs:`, uploadedUrls);
+
+    if (uploadedUrls.length > 0) {
+      setReviews((prev) => {
+        const updated = prev.map((review, i) =>
+          i === index 
+            ? { ...review, review_images: [...(review.review_images || []), ...uploadedUrls] } 
+            : review
+        );
+        console.log(`[Review Image Upload] Updated reviews state for review #${index}:`, updated[index]);
+        return updated;
+      });
+      alert(`Successfully uploaded ${uploadedUrls.length} image(s)!`);
+    } else {
+      alert('No images were uploaded. Please try again.');
+    }
+    
+    setUploadingReviewImages(false);
+    // Reset file input
+    event.target.value = '';
+  };
+
+  // Handle review media uploads (videos)
+  const handleReviewMediaVideoUpload = async (
+    index: number,
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    console.log(`[Review Video Upload] Starting upload for review #${index}, ${files.length} file(s)`);
+    setUploadingVideos(true);
+    const uploadedUrls: string[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      console.log(`[Review Video Upload] Uploading file ${i + 1}/${files.length}: ${file.name}`);
+      const result = await uploadFile(file, "reviewmedia", "reviews");
+      
+      if (result.error) {
+        console.error(`[Review Video Upload] Error uploading ${file.name}:`, result.error);
+        alert(`Error uploading ${file.name}: ${result.error}`);
+        continue;
+      }
+      
+      console.log(`[Review Video Upload] Successfully uploaded ${file.name}, URL:`, result.url);
+      uploadedUrls.push(result.url);
+    }
+
+    console.log(`[Review Video Upload] Total uploaded URLs:`, uploadedUrls);
+
+    if (uploadedUrls.length > 0) {
+      setReviews((prev) => {
+        const updated = prev.map((review, i) =>
+          i === index 
+            ? { ...review, review_videos: [...(review.review_videos || []), ...uploadedUrls] } 
+            : review
+        );
+        console.log(`[Review Video Upload] Updated reviews state for review #${index}:`, updated[index]);
+        return updated;
+      });
+      alert(`Successfully uploaded ${uploadedUrls.length} video(s)!`);
+    } else {
+      alert('No videos were uploaded. Please try again.');
+    }
+    
+    setUploadingVideos(false);
+    // Reset file input
+    event.target.value = '';
+  };
+
+  // Remove review media image
+  const removeReviewMediaImage = (reviewIndex: number, mediaIndex: number) => {
+    setReviews((prev) =>
+      prev.map((review, i) =>
+        i === reviewIndex 
+          ? { ...review, review_images: review.review_images?.filter((_, idx) => idx !== mediaIndex) || [] } 
+          : review
+      )
+    );
+  };
+
+  // Remove review media video
+  const removeReviewMediaVideo = (reviewIndex: number, mediaIndex: number) => {
+    setReviews((prev) =>
+      prev.map((review, i) =>
+        i === reviewIndex 
+          ? { ...review, review_videos: review.review_videos?.filter((_, idx) => idx !== mediaIndex) || [] } 
+          : review
       )
     );
   };
@@ -1798,7 +2034,66 @@ function ProductFormContent() {
                         Variant Configuration
                       </h3>
                       <div className="space-y-4">
-                        {variants.map((variant) => {
+                        {[...variants]
+                          .sort((a, b) => {
+                            // Sort variants by size order
+                            const sizeA = sizes.find((s) => s.id === a.size_id);
+                            const sizeB = sizes.find((s) => s.id === b.size_id);
+                            
+                            if (!sizeA || !sizeB) return 0;
+                            
+                            const nameA = sizeA.name.trim();
+                            const nameB = sizeB.name.trim();
+                            
+                            // Comprehensive size ordering
+                            const sizeOrder = [
+                              'XXXS', 'XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', 
+                              '2XL', '3XL', '4XL', '5XL', '6XL',
+                              'ONE SIZE', 'FREE SIZE', 'OS', 'UNIVERSAL'
+                            ];
+                            
+                            // Check if both are in the predefined size order
+                            const upperA = nameA.toUpperCase();
+                            const upperB = nameB.toUpperCase();
+                            const indexA = sizeOrder.indexOf(upperA);
+                            const indexB = sizeOrder.indexOf(upperB);
+                            
+                            if (indexA !== -1 && indexB !== -1) {
+                              return indexA - indexB;
+                            }
+                            if (indexA !== -1) return -1; // A is a standard size, B is not
+                            if (indexB !== -1) return 1;  // B is a standard size, A is not
+                            
+                            // Check if both are purely numeric (shoe sizes, etc.)
+                            const numA = parseFloat(nameA);
+                            const numB = parseFloat(nameB);
+                            
+                            if (!isNaN(numA) && !isNaN(numB)) {
+                              return numA - numB;
+                            }
+                            
+                            // Check for numeric with suffix (e.g., "28W", "32L")
+                            const numericPrefixRegex = /^(\d+\.?\d*)/;
+                            const matchA = nameA.match(numericPrefixRegex);
+                            const matchB = nameB.match(numericPrefixRegex);
+                            
+                            if (matchA && matchB) {
+                              const prefixA = parseFloat(matchA[1]);
+                              const prefixB = parseFloat(matchB[1]);
+                              if (prefixA !== prefixB) {
+                                return prefixA - prefixB;
+                              }
+                              // If numeric parts are equal, compare the rest
+                              return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+                            }
+                            
+                            // Fallback to natural sort (handles mixed alphanumeric)
+                            return nameA.localeCompare(nameB, undefined, { 
+                              numeric: true, 
+                              sensitivity: 'base' 
+                            });
+                          })
+                          .map((variant) => {
                           const color = colors.find(
                             (c) => c.id === variant.color_id
                           );
@@ -2214,28 +2509,60 @@ function ProductFormContent() {
                     <h3 className="text-lg font-medium text-gray-900">
                       Product Reviews (Optional)
                     </h3>
-                    <button
-                      type="button"
-                      onClick={() => setShowReviewsSection(!showReviewsSection)}
-                      className="text-sm text-[#F53F7A] hover:text-[#F53F7A]/80 font-medium"
-                    >
-                      {showReviewsSection ? "Hide Reviews" : "Show Reviews"}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={addReview}
+                        className="px-3 py-1.5 bg-[#F53F7A] text-white text-sm rounded-lg hover:bg-[#F53F7A]/90 flex items-center gap-1 font-medium"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        Add Review
+                      </button>
+                      <label className="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 flex items-center gap-1 font-medium cursor-pointer transition-colors">
+                        <input
+                          type="file"
+                          accept=".csv,.xlsx,.xls"
+                          onChange={handleBulkReviewUpload}
+                          className="hidden"
+                        />
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                        Upload CSV
+                      </label>
+                      <a
+                        href="/sample-reviews-template.csv"
+                        download="sample-reviews-template.csv"
+                        className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 flex items-center gap-1 font-medium transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        Template
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => setShowReviewsSection(!showReviewsSection)}
+                        className="text-sm text-[#F53F7A] hover:text-[#F53F7A]/80 font-medium"
+                      >
+                        {showReviewsSection ? "Hide Reviews" : "Show Reviews"}
+                      </button>
+                    </div>
                   </div>
 
                   {showReviewsSection && (
                     <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm text-gray-600">
-                          Add customer reviews to showcase product quality
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <p className="text-sm text-blue-800 font-medium mb-1">📄 CSV Format Guide:</p>
+                        <p className="text-xs text-blue-700">
+                          <strong>Required columns:</strong> name, rating (1-5) | 
+                          <strong> Optional:</strong> comment, date (YYYY-MM-DD), verified (true/false)
                         </p>
-                        <button
-                          type="button"
-                          onClick={addReview}
-                          className="px-3 py-1 bg-[#F53F7A] text-white text-sm rounded-lg hover:bg-[#F53F7A]/90"
-                        >
-                          Add Review
-                        </button>
+                        <p className="text-xs text-blue-600 mt-1">
+                          Example: <code className="bg-blue-100 px-1 rounded">name,rating,comment,date,verified</code>
+                        </p>
                       </div>
 
                       {reviews.length === 0 ? (
@@ -2258,156 +2585,197 @@ function ProductFormContent() {
                           </p>
                         </div>
                       ) : (
-                        <div className="space-y-2">
+                        <div className="space-y-3">
                           {reviews.map((review, index) => (
                             <div
                               key={index}
-                              className="border border-gray-200 rounded-lg p-3 relative"
+                              className="border border-gray-200 rounded-lg p-4 bg-white hover:shadow-sm transition-shadow relative"
                             >
-                              <div className="flex items-center gap-3 overflow-x-auto">
-                                {/* Review Number and Remove Button */}
-                                <div className="flex items-center gap-2 flex-shrink-0">
-                                  <span className="text-sm font-medium text-gray-900">
+                              {/* Delete Button */}
+                              <button
+                                type="button"
+                                onClick={() => removeReview(index)}
+                                className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-md z-10"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+
+                              {/* Horizontal Layout - All in One Row */}
+                              <div className="flex items-start gap-4">
+                                {/* Review Number & Verification */}
+                                <div className="flex flex-col gap-2 items-center flex-shrink-0">
+                                  <span className="text-sm font-bold text-gray-900 bg-gray-100 px-2 py-1 rounded">
                                     #{index + 1}
                                   </span>
-
                                   <button
                                     type="button"
-                                    onClick={() => removeReview(index)}
-                                    className="w-4 h-4 absolute -top-2 -right-2 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
+                                    onClick={() => toggleReviewVerification(index)}
+                                    className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+                                      review.is_verified
+                                        ? "bg-green-100 text-green-700"
+                                        : "bg-gray-100 text-gray-600"
+                                    }`}
                                   >
-                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
+                                    {review.is_verified ? "✓" : "○"}
                                   </button>
                                 </div>
 
-                                {/* Verification Status */}
-                                <button
-                                  type="button"
-                                  onClick={() => toggleReviewVerification(index)}
-                                  className={`px-2 py-1 text-xs rounded-full flex-shrink-0 ${
-                                    review.is_verified
-                                      ? "bg-green-100 text-green-800"
-                                      : "bg-gray-100 text-gray-600"
-                                  }`}
-                                >
-                                  {review.is_verified ? "✓" : "○"}
-                                </button>
-
-                                {/* All inputs in one horizontal row */}
-                                <div className="flex gap-3 min-w-max">
-                                  {/* Reviewer Name */}
-                                  <div className="w-32 flex-shrink-0">
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      Name
+                                {/* Profile Picture */}
+                                <div className="flex flex-col gap-1 flex-shrink-0">
+                                  <label className="text-xs font-medium text-gray-700">Profile</label>
+                                  {review.profile_image_url ? (
+                                    <div className="relative">
+                                      <img
+                                        src={review.profile_image_url}
+                                        alt="Profile"
+                                        className="h-16 w-16 rounded-full object-cover border-2 border-gray-300"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => removeReviewImage(index)}
+                                        className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs hover:bg-red-600"
+                                      >
+                                        ×
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <label className="h-16 w-16 rounded-full bg-gray-100 flex items-center justify-center border-2 border-dashed border-gray-300 cursor-pointer hover:border-[#F53F7A] transition-colors">
+                                      <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => handleReviewImageUpload(index, e)}
+                                        className="hidden"
+                                      />
+                                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                      </svg>
                                     </label>
+                                  )}
+                                </div>
+
+                                {/* Basic Info Fields */}
+                                <div className="flex flex-col gap-2 min-w-[140px]">
+                                  <div>
+                                    <label className="text-xs font-medium text-gray-700 block mb-1">Name</label>
                                     <input
                                       type="text"
                                       value={review.reviewer_name}
                                       onChange={(e) => updateReview(index, "reviewer_name", e.target.value)}
-                                      className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
-                                      placeholder="Name"
+                                      className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#F53F7A]"
+                                      placeholder="Reviewer name"
                                     />
                                   </div>
-
-                                  {/* Rating */}
-                                  <div className="w-24 flex-shrink-0">
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      Rating
-                                    </label>
-                                    <div className="flex items-center gap-1">
-                                      {[1, 2, 3, 4, 5].map((star) => (
-                                        <button
-                                          key={star}
-                                          type="button"
-                                          onClick={() => updateReview(index, "rating", star)}
-                                          className={`text-lg ${
-                                            star <= review.rating ? "text-yellow-400" : "text-gray-300"
-                                          }`}
-                                        >
-                                          ★
-                                        </button>
-                                      ))}
-                                    </div>
-                                  </div>
-
-                                  {/* Review Date */}
-                                  <div className="w-28 flex-shrink-0">
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      Date
-                                    </label>
+                                  <div>
+                                    <label className="text-xs font-medium text-gray-700 block mb-1">Date</label>
                                     <input
                                       type="date"
                                       value={review.date}
                                       onChange={(e) => updateReview(index, "date", e.target.value)}
-                                      className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
+                                      className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#F53F7A]"
                                     />
                                   </div>
+                                </div>
 
-                                  {/* Comment */}
-                                  <div className="w-48 flex-shrink-0">
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      Comment
-                                    </label>
-                                    <input
-                                      type="text"
-                                      value={review.comment}
-                                      onChange={(e) => updateReview(index, "comment", e.target.value)}
-                                      className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
-                                      placeholder="Comment"
-                                    />
+                                {/* Rating */}
+                                <div className="flex flex-col gap-1 flex-shrink-0">
+                                  <label className="text-xs font-medium text-gray-700">Rating</label>
+                                  <div className="flex items-center gap-1">
+                                    {[1, 2, 3, 4, 5].map((star) => (
+                                      <button
+                                        key={star}
+                                        type="button"
+                                        onClick={() => updateReview(index, "rating", star)}
+                                        className={`text-xl hover:scale-110 transition-transform ${
+                                          star <= review.rating ? "text-yellow-400" : "text-gray-300"
+                                        }`}
+                                      >
+                                        ★
+                                      </button>
+                                    ))}
                                   </div>
+                                </div>
 
-                                  {/* Profile Image */}
-                                  <div className="w-32 flex-shrink-0">
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      Profile
-                                    </label>
-                                    <div className="flex items-center gap-2">
-                                      {review.profile_image_url ? (
-                                        <div className="relative">
-                                          <img
-                                            src={review.profile_image_url}
-                                            alt="Profile"
-                                            className="h-12 w-12 rounded-full object-cover border"
-                                          />
-                                          <button
-                                            type="button"
-                                            onClick={() => removeReviewImage(index)}
-                                            className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs hover:bg-red-600"
-                                          >
-                                            ×
-                                          </button>
-                                        </div>
-                                      ) : (
-                                        <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">
-                                          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                          </svg>
-                                        </div>
-                                      )}
-                                      <div className="flex gap-1">
-                                        <label>
-                                          <input
-                                            type="file"
-                                            accept="image/*"
-                                            onChange={(e) => handleReviewImageUpload(index, e)}
-                                            className="hidden"
-                                          />
-                                          <div className="px-2 py-1 border border-gray-300 rounded text-xs text-gray-600 hover:bg-gray-50 cursor-pointer">
-                                            {uploadingReviewImages ? "..." : "Upload"}
-                                          </div>
-                                        </label>
-                                        <input
-                                          type="url"
-                                          value={review.profile_image_url || ""}
-                                          onChange={(e) => updateReview(index, "profile_image_url", e.target.value)}
-                                          placeholder="URL"
-                                          className="w-16 border border-gray-300 rounded px-1 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
+                                {/* Comment */}
+                                <div className="flex-1 min-w-[200px]">
+                                  <label className="text-xs font-medium text-gray-700 block mb-1">Comment</label>
+                                  <textarea
+                                    value={review.comment}
+                                    onChange={(e) => updateReview(index, "comment", e.target.value)}
+                                    rows={3}
+                                    className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#F53F7A] resize-none"
+                                    placeholder="Review comment..."
+                                  />
+                                </div>
+
+                                {/* Review Images */}
+                                <div className="flex flex-col gap-1">
+                                  <label className="text-xs font-medium text-gray-700">Images</label>
+                                  <div className="flex gap-1 flex-wrap max-w-[200px]">
+                                    {(review.review_images || []).map((url, imgIdx) => (
+                                      <div key={imgIdx} className="relative">
+                                        <img
+                                          src={url}
+                                          alt={`Review ${index + 1} Image ${imgIdx + 1}`}
+                                          className="h-14 w-14 rounded object-cover border border-gray-300 hover:border-[#F53F7A] transition-colors"
                                         />
+                                        <button
+                                          type="button"
+                                          onClick={() => removeReviewMediaImage(index, imgIdx)}
+                                          className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs hover:bg-red-600"
+                                        >
+                                          ×
+                                        </button>
                                       </div>
-                                    </div>
+                                    ))}
+                                    <label className="h-14 w-14 flex items-center justify-center border border-dashed border-gray-300 rounded text-gray-400 hover:border-[#F53F7A] hover:text-[#F53F7A] cursor-pointer transition-colors">
+                                      <input
+                                        type="file"
+                                        accept="image/*"
+                                        multiple
+                                        onChange={(e) => handleReviewMediaImageUpload(index, e)}
+                                        className="hidden"
+                                      />
+                                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                      </svg>
+                                    </label>
+                                  </div>
+                                </div>
+
+                                {/* Review Videos */}
+                                <div className="flex flex-col gap-1">
+                                  <label className="text-xs font-medium text-gray-700">Videos</label>
+                                  <div className="flex gap-1 flex-wrap max-w-[200px]">
+                                    {(review.review_videos || []).map((url, vidIdx) => (
+                                      <div key={vidIdx} className="relative">
+                                        <video
+                                          src={url}
+                                          className="h-14 w-14 rounded object-cover border border-gray-300 hover:border-purple-600 transition-colors"
+                                          controls
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => removeReviewMediaVideo(index, vidIdx)}
+                                          className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs hover:bg-red-600"
+                                        >
+                                          ×
+                                        </button>
+                                      </div>
+                                    ))}
+                                    <label className="h-14 w-14 flex items-center justify-center border border-dashed border-gray-300 rounded text-gray-400 hover:border-purple-600 hover:text-purple-600 cursor-pointer transition-colors">
+                                      <input
+                                        type="file"
+                                        accept="video/*"
+                                        multiple
+                                        onChange={(e) => handleReviewMediaVideoUpload(index, e)}
+                                        className="hidden"
+                                      />
+                                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                      </svg>
+                                    </label>
                                   </div>
                                 </div>
                               </div>
@@ -2483,10 +2851,8 @@ function ProductFormContent() {
                   <button
                     type="button"
                     onClick={() => {
-                      const availableSizes = formData.category_id 
-                        ? sizes.filter(s => s.category_id === formData.category_id).map(s => s.id)
-                        : sizes.map(s => s.id);
-                      setSelectedSizesForMedia(availableSizes);
+                      // Select all sizes regardless of category
+                      setSelectedSizesForMedia(sizes.map(s => s.id));
                     }}
                     className="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
                   >
@@ -2508,41 +2874,92 @@ function ProductFormContent() {
                       No sizes available. Please add sizes in the system first.
                     </div>
                   ) : (
-                    sizes
-                      .filter(size => !formData.category_id || size.category_id === formData.category_id)
-                      .map((size) => {
-                        const isSelected = selectedSizesForMedia.includes(size.id);
+                    [...sizes]
+                      .sort((a, b) => {
+                        const nameA = a.name.trim();
+                        const nameB = b.name.trim();
                         
-                        return (
-                          <label
-                            key={size.id}
-                            className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all ${
-                              isSelected
-                                ? 'bg-[#F53F7A] text-white'
-                                : 'bg-white hover:bg-gray-50'
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setSelectedSizesForMedia([...selectedSizesForMedia, size.id]);
-                                } else {
-                                  setSelectedSizesForMedia(selectedSizesForMedia.filter(id => id !== size.id));
-                                }
-                              }}
-                              className="h-5 w-5 rounded border-gray-300 text-[#F53F7A] focus:ring-[#F53F7A]"
-                            />
-                            <span className="font-medium">{size.name}</span>
-                            {selectedColors.length > 0 && (
-                              <span className={`text-xs ${isSelected ? 'text-white/80' : 'text-gray-500'}`}>
-                                (All colors)
-                              </span>
-                            )}
-                          </label>
-                        );
+                        // Comprehensive size ordering
+                        const sizeOrder = [
+                          'XXXS', 'XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', 
+                          '2XL', '3XL', '4XL', '5XL', '6XL',
+                          'ONE SIZE', 'FREE SIZE', 'OS', 'UNIVERSAL'
+                        ];
+                        
+                        // Check if both are in the predefined size order
+                        const upperA = nameA.toUpperCase();
+                        const upperB = nameB.toUpperCase();
+                        const indexA = sizeOrder.indexOf(upperA);
+                        const indexB = sizeOrder.indexOf(upperB);
+                        
+                        if (indexA !== -1 && indexB !== -1) {
+                          return indexA - indexB;
+                        }
+                        if (indexA !== -1) return -1; // A is a standard size, B is not
+                        if (indexB !== -1) return 1;  // B is a standard size, A is not
+                        
+                        // Check if both are purely numeric (shoe sizes, etc.)
+                        const numA = parseFloat(nameA);
+                        const numB = parseFloat(nameB);
+                        
+                        if (!isNaN(numA) && !isNaN(numB)) {
+                          return numA - numB;
+                        }
+                        
+                        // Check for numeric with suffix (e.g., "28W", "32L")
+                        const numericPrefixRegex = /^(\d+\.?\d*)/;
+                        const matchA = nameA.match(numericPrefixRegex);
+                        const matchB = nameB.match(numericPrefixRegex);
+                        
+                        if (matchA && matchB) {
+                          const prefixA = parseFloat(matchA[1]);
+                          const prefixB = parseFloat(matchB[1]);
+                          if (prefixA !== prefixB) {
+                            return prefixA - prefixB;
+                          }
+                          // If numeric parts are equal, compare the rest
+                          return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+                        }
+                        
+                        // Fallback to natural sort (handles mixed alphanumeric)
+                        return nameA.localeCompare(nameB, undefined, { 
+                          numeric: true, 
+                          sensitivity: 'base' 
+                        });
                       })
+                      .map((size) => {
+                      const isSelected = selectedSizesForMedia.includes(size.id);
+                      
+                      return (
+                        <label
+                          key={size.id}
+                          className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all ${
+                            isSelected
+                              ? 'bg-[#F53F7A] text-white'
+                              : 'bg-white hover:bg-gray-50'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedSizesForMedia([...selectedSizesForMedia, size.id]);
+                              } else {
+                                setSelectedSizesForMedia(selectedSizesForMedia.filter(id => id !== size.id));
+                              }
+                            }}
+                            className="h-5 w-5 rounded border-gray-300 text-[#F53F7A] focus:ring-[#F53F7A]"
+                          />
+                          <span className="font-medium">{size.name}</span>
+                          {selectedColors.length > 0 && (
+                            <span className={`text-xs ${isSelected ? 'text-white/80' : 'text-gray-500'}`}>
+                              (All colors)
+                            </span>
+                          )}
+                        </label>
+                      );
+                    })
                   )}
                 </div>
               </div>

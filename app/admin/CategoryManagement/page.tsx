@@ -40,7 +40,7 @@ type Product = {
   display_order_within_feature?: number;
   category?: {
     name: string;
-  };
+  } | { name: string }[] | null;
 };
 
 type FeatureSection = {
@@ -440,6 +440,47 @@ export default function CategoryManagement() {
         console.error('Error updating section order:', error);
         // Revert the order if the API call fails
         fetchFeatureSections();
+      }
+    }
+  };
+
+  // Drag and Drop handlers for featured products
+  const handleProductDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = products.findIndex((p) => p.id === active.id);
+      const newIndex = products.findIndex((p) => p.id === over.id);
+
+      const newProducts = arrayMove(products, oldIndex, newIndex);
+      setProducts(newProducts);
+
+      // Update display_order_within_feature in the database for all affected products
+      try {
+        const updates = newProducts.map((product, index) => ({
+          id: product.id,
+          display_order_within_feature: index,
+        }));
+
+        const { error } = await supabase
+          .from('products')
+          .upsert(
+            updates.map((u) => ({
+              id: u.id,
+              display_order_within_feature: u.display_order_within_feature,
+              updated_at: new Date().toISOString(),
+            }))
+          );
+
+        if (error) {
+          console.error('Failed to update product order:', error);
+          // Revert the order if the update fails
+          fetchFeaturedProducts();
+        }
+      } catch (error) {
+        console.error('Error updating product order:', error);
+        // Revert the order if the API call fails
+        fetchFeaturedProducts();
       }
     }
   };
@@ -1132,5 +1173,112 @@ function SortableCategoryCard({
         </button>
       </div>
     </div>
+  );
+}
+
+// Sortable Product Row Component
+type SortableProductRowProps = {
+  product: Product;
+  onUpdateFeatureType: (productId: string, featureType: "trending" | "best_seller" | null) => void;
+  onEditProduct: (productId: string) => void;
+};
+
+function SortableProductRow({
+  product,
+  onUpdateFeatureType,
+  onEditProduct,
+}: SortableProductRowProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: product.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  // Helper to get category name
+  const getCategoryName = () => {
+    if (!product.category) return 'N/A';
+    if (Array.isArray(product.category)) {
+      return product.category[0]?.name || 'N/A';
+    }
+    return product.category.name || 'N/A';
+  };
+
+  return (
+    <tr ref={setNodeRef} style={style} className="hover:bg-gray-50">
+      {/* Drag Handle */}
+      <td className="px-6 py-4 whitespace-nowrap">
+        <div
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 transition-colors"
+          title="Drag to reorder"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+          </svg>
+        </div>
+      </td>
+
+      {/* Product Name */}
+      <td className="px-6 py-4 whitespace-nowrap">
+        <div className="text-sm font-medium text-gray-900">{product.name}</div>
+      </td>
+
+      {/* Category */}
+      <td className="px-6 py-4 whitespace-nowrap">
+        <div className="text-sm text-gray-500">{getCategoryName()}</div>
+      </td>
+
+      {/* Feature Type */}
+      <td className="px-6 py-4 whitespace-nowrap">
+        <select
+          value={product.featured_type || ''}
+          onChange={(e) => {
+            const value = e.target.value;
+            onUpdateFeatureType(
+              product.id,
+              value === '' ? null : value as "trending" | "best_seller"
+            );
+          }}
+          className="text-sm border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
+        >
+          <option value="">None</option>
+          <option value="trending">Trending</option>
+          <option value="best_seller">Best Seller</option>
+        </select>
+      </td>
+
+      {/* Status */}
+      <td className="px-6 py-4 whitespace-nowrap">
+        <span
+          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+            product.is_active
+              ? 'bg-green-100 text-green-800'
+              : 'bg-red-100 text-red-800'
+          }`}
+        >
+          {product.is_active ? 'Active' : 'Inactive'}
+        </span>
+      </td>
+
+      {/* Actions */}
+      <td className="px-6 py-4 whitespace-nowrap text-sm">
+        <button
+          onClick={() => onEditProduct(product.id)}
+          className="text-[#F53F7A] hover:text-[#F53F7A]/80 font-medium transition-colors"
+        >
+          Edit
+        </button>
+      </td>
+    </tr>
   );
 }

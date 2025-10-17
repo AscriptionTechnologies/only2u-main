@@ -934,11 +934,10 @@ const OrderManagementPage = () => {
         </div>
       </div>
         )}
-      </div>
 
       {viewDraftModalOpen && selectedDraftOrder && (
         <ViewDraftDetailsModal
-          draftOrder={selectedDraftOrder}
+          draftOrder={selectedDraftOrder!}
           onClose={() => {
             setViewDraftModalOpen(false);
             setSelectedDraftOrder(null);
@@ -948,7 +947,7 @@ const OrderManagementPage = () => {
       
       {viewModalOpen && selectedOrder && (
         <ViewDetailsModal
-          order={selectedOrder}
+          order={selectedOrder!}
           onClose={() => {
             setViewModalOpen(false);
             setSelectedOrder(null);
