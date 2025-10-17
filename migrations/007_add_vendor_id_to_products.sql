@@ -4,24 +4,23 @@
 
 -- Add vendor_id column to products table
 ALTER TABLE products 
-ADD COLUMN IF NOT EXISTS vendor_id UUID REFERENCES users(id) ON DELETE SET NULL;
+ADD COLUMN IF NOT EXISTS vendor_id UUID REFERENCES vendors(id) ON DELETE SET NULL;
 
 -- Add index for better performance on vendor queries
 CREATE INDEX IF NOT EXISTS idx_products_vendor_id 
 ON products(vendor_id);
 
 -- Optional: Migrate existing vendor_name to vendor_id if possible
--- This attempts to match vendor_name with existing vendors in users table
--- Only if you have vendors with matching names in the users table
+-- This attempts to match vendor_name with existing vendors in vendors table
+-- Only if you have vendors with matching names in the vendors table
 -- UPDATE products 
--- SET vendor_id = users.id
--- FROM users
--- WHERE products.vendor_name = users.name 
--- AND users.role = 'vendor'
+-- SET vendor_id = vendors.id
+-- FROM vendors
+-- WHERE products.vendor_name = vendors.name 
 -- AND products.vendor_id IS NULL;
 
 -- Add comment for documentation
-COMMENT ON COLUMN products.vendor_id IS 'Foreign key to users table (vendor role). Links product to its vendor.';
+COMMENT ON COLUMN products.vendor_id IS 'Foreign key to vendors table. Links product to its vendor.';
 
 -- Note: vendor_name and alias_vendor columns are kept for backwards compatibility
 -- You can optionally drop them later if no longer needed:

@@ -104,7 +104,9 @@ function ProductFormContent() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [colors, setColors] = useState<Color[]>([]);
   const [sizes, setSizes] = useState<Size[]>([]);
-  const [vendors, setVendors] = useState<{ id: string; name: string }[]>([]);
+  const [vendors, setVendors] = useState<{ id: string; business_name: string; profile_image_url?: string; location?: string }[]>([]);
+  const [showVendorModal, setShowVendorModal] = useState(false);
+  const [vendorSearch, setVendorSearch] = useState("");
   const [uploadingImages, setUploadingImages] = useState(false);
   const [uploadingVideos, setUploadingVideos] = useState(false);
   const [failedImages, setFailedImages] = useState<Set<number>>(new Set());
@@ -241,16 +243,15 @@ function ProductFormContent() {
   const fetchVendors = async () => {
     try {
       const { data, error } = await supabase
-        .from("users")
-        .select("id, name")
-        .eq("role", "vendor")
-        .eq("is_active", true)
-        .order("name", { ascending: true });
+        .from("vendors")
+        .select("id, business_name, profile_image_url, location, is_verified")
+        .eq("is_verified", true)
+        .order("business_name", { ascending: true });
       if (error) {
         console.error("Error fetching vendors:", error);
         return;
       }
-      setVendors(data || []);
+      setVendors((data as any[])?.map(v => ({ id: v.id, business_name: v.business_name, profile_image_url: v.profile_image_url, location: v.location })) || []);
     } catch (error) {
       console.error("Error fetching vendors:", error);
     }
@@ -2454,26 +2455,15 @@ function ProductFormContent() {
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Select Vendor <span className="text-red-500">*</span>
                         </label>
-                        <select
-                          value={formData.vendor_id}
-                          onChange={(e) => {
-                            const selectedVendor = vendors.find(v => v.id === e.target.value);
-                            setFormData({
-                              ...formData,
-                              vendor_id: e.target.value,
-                              vendor_name: selectedVendor?.name || "",
-                            });
-                          }}
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
-                          required
+                        <button
+                          type="button"
+                          onClick={() => setShowVendorModal(true)}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-left hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#F53F7A]"
                         >
-                          <option value="">-- Select Vendor --</option>
-                          {vendors.map((vendor) => (
-                            <option key={vendor.id} value={vendor.id}>
-                              {vendor.name}
-                            </option>
-                          ))}
-                        </select>
+                          {formData.vendor_id
+                            ? vendors.find(v => v.id === formData.vendor_id)?.business_name || 'Change vendor'
+                            : '-- Select Vendor --'}
+                        </button>
                         {vendors.length === 0 && (
                           <p className="text-xs text-gray-500 mt-1">
                             No active vendors found. Please add vendors first.
@@ -2500,6 +2490,55 @@ function ProductFormContent() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Vendor Select Modal */}
+                  {showVendorModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+                      <div className="bg-white w-full max-w-xl rounded-lg shadow-xl p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="text-lg font-semibold">Select Vendor</h4>
+                          <button onClick={() => setShowVendorModal(false)} className="text-gray-500 hover:text-gray-700">✕</button>
+                        </div>
+                        <input
+                          type="text"
+                          placeholder="Search vendor..."
+                          value={vendorSearch}
+                          onChange={(e) => setVendorSearch(e.target.value)}
+                          className="w-full mb-3 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#F53F7A]"
+                        />
+                        <div className="max-h-80 overflow-y-auto divide-y">
+                          {vendors
+                            .filter(v => v.business_name.toLowerCase().includes(vendorSearch.toLowerCase()))
+                            .map(vendor => (
+                              <button
+                                key={vendor.id}
+                                type="button"
+                                onClick={() => {
+                                  setFormData({ ...formData, vendor_id: vendor.id, vendor_name: vendor.business_name });
+                                  setShowVendorModal(false);
+                                }}
+                                className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 text-left"
+                              >
+                                {vendor.profile_image_url ? (
+                                  <img src={vendor.profile_image_url} alt={vendor.business_name} className="h-9 w-9 rounded-full object-cover" />
+                                ) : (
+                                  <div className="h-9 w-9 rounded-full bg-gray-200 flex items-center justify-center text-gray-600">
+                                    {vendor.business_name.charAt(0).toUpperCase()}
+                                  </div>
+                                )}
+                                <div className="flex-1">
+                                  <div className="font-medium text-gray-900">{vendor.business_name}</div>
+                                  {vendor.location && <div className="text-xs text-gray-500">{vendor.location}</div>}
+                                </div>
+                              </button>
+                            ))}
+                          {vendors.filter(v => v.business_name.toLowerCase().includes(vendorSearch.toLowerCase())).length === 0 && (
+                            <div className="p-6 text-center text-gray-500">No vendors found</div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Return Policy */}

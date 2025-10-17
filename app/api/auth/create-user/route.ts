@@ -63,6 +63,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: userError.message }, { status: 400 });
     }
 
+    // If role is vendor, also insert into vendors table using provided schema
+    if (role.toLowerCase() === 'vendor') {
+      const { error: vendorError } = await supabase.from('vendors').insert({
+        id: authData.user.id,
+        user_id: authData.user.id,
+        business_name: name,
+        description: null,
+        profile_image_url: profilePhoto || null,
+        cover_image_url: null,
+        website_url: null,
+        instagram_handle: null,
+        tiktok_handle: null,
+        location: location || null,
+        is_verified: is_active ?? true,
+        follower_count: 0,
+        following_count: 0,
+        product_count: 0,
+      });
+
+      if (vendorError) {
+        console.error('Vendor data error:', vendorError);
+        // Note: User is already created in users table, this is just a warning
+        console.warn('Vendor created in users table but not in vendors table');
+      }
+    }
+
     return NextResponse.json({ 
       success: true, 
       user: { id: authData.user.id, email, name, role } 

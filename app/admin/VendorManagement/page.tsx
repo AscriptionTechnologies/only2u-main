@@ -40,11 +40,23 @@ const VendorManagement = () => {
   const fetchVendors = async () => {
     setLoading(true);
     const { data, error } = await supabase
-      .from("users")
-      .select("id, name, email, is_active, location, phone, profilePhoto")
-      .eq("role", "vendor")
+      .from("vendors")
+      .select("id, user_id, business_name, location, is_verified, profile_image_url")
       .order("created_at", { ascending: false });
-    if (!error) setVendors((data as Vendor[]) || []);
+    if (error) {
+      console.error("Error fetching vendors:", error);
+    }
+    // Map vendors table schema to UI Vendor interface for compatibility
+    const mapped = (data || []).map((v: any) => ({
+      id: v.id,
+      name: v.business_name,
+      email: "",
+      is_active: !!v.is_verified,
+      location: v.location || "",
+      phone: "",
+      profilePhoto: v.profile_image_url || "",
+    })) as Vendor[];
+    setVendors(mapped);
     setLoading(false);
   };
 
@@ -81,19 +93,19 @@ const VendorManagement = () => {
     
     try {
       setSubmitting(true);
-      const { error } = await supabase.from("users").delete().eq("id", vendor.id);
+      const { error } = await supabase.from("vendors").delete().eq("id", vendor.id);
       
       if (error) {
         console.error("Error deleting vendor:", error);
-        alert("Error deleting vendor");
+        alert(`Error deleting vendor: ${error.message || 'Unknown error'}`);
         return;
       }
       
       setVendors(prev => prev.filter(v => v.id !== vendor.id));
       alert("Vendor deleted successfully");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error:", error);
-      alert("An error occurred while deleting vendor");
+      alert(`An error occurred while deleting vendor: ${error.message || 'Unknown error'}`);
     } finally {
       setSubmitting(false);
     }
@@ -101,24 +113,40 @@ const VendorManagement = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate required fields
+    if (!formData.name.trim()) {
+      alert("Please enter vendor name");
+      return;
+    }
+    if (!formData.email.trim()) {
+      alert("Please enter vendor email");
+      return;
+    }
+    if (!editingVendor && !formData.password.trim()) {
+      alert("Please enter vendor password");
+      return;
+    }
+    
     setSubmitting(true);
     if (editingVendor) {
-      // Update vendor - only update the users table since auth is already created
-      const { error } = await supabase.from("users").update({
+      // Update vendor in the vendors table
+      const { error } = await supabase.from("vendors").update({
         name: formData.name,
         email: formData.email,
         is_active: formData.is_active,
         location: formData.location,
         phone: formData.phone,
         profilePhoto: formData.profilePhoto,
-        role: "vendor", // Always ensure role is vendor in lowercase
       }).eq("id", editingVendor.id);
       setSubmitting(false);
       if (!error) {
+        alert("Vendor updated successfully!");
         setModalVisible(false);
         fetchVendors();
       } else {
-        console.log(error, "error updating vendor");
+        console.error("Error updating vendor:", error);
+        alert(`Error updating vendor: ${error.message || 'Unknown error'}`);
       }
     } else {
       // Add new vendor - use API route to create authenticated user
@@ -143,16 +171,19 @@ const VendorManagement = () => {
         const result = await response.json();
 
         if (!response.ok) {
-          console.log(result.error, "API error");
+          console.error("API error:", result.error);
+          alert(`Error creating vendor: ${result.error || 'Unknown error'}`);
           setSubmitting(false);
           return;
         }
 
+        alert("Vendor created successfully!");
         setSubmitting(false);
         setModalVisible(false);
         fetchVendors();
-      } catch (error) {
-        console.log(error, "error creating vendor");
+      } catch (error: any) {
+        console.error("Error creating vendor:", error);
+        alert(`Error creating vendor: ${error.message || 'Network error occurred'}`);
         setSubmitting(false);
       }
     }
