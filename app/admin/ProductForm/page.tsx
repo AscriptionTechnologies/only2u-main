@@ -1078,7 +1078,7 @@ function ProductFormContent() {
     const urls: string[] = [];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      const result = await uploadFile(file, "productvideos", "productvideos");
+      const result = await uploadFile(file, "productvideos", "video");
       if (result.error) {
         alert(`Error uploading video: ${result.error}`);
         continue;
@@ -1184,7 +1184,7 @@ function ProductFormContent() {
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      const result = await uploadFile(file, "productvideos", "productvideos");
+      const result = await uploadFile(file, "productvideos", "video");
 
       if (result.error) {
         alert(`Error uploading video: ${result.error}`);
@@ -1482,7 +1482,7 @@ function ProductFormContent() {
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       console.log(`[Review Image Upload] Uploading file ${i + 1}/${files.length}: ${file.name}`);
-      const result = await uploadFile(file, "reviewmedia", "reviews");
+      const result = await uploadFile(file, "reviewmedia", "image");
       
       if (result.error) {
         console.error(`[Review Image Upload] Error uploading ${file.name}:`, result.error);
@@ -1531,7 +1531,7 @@ function ProductFormContent() {
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       console.log(`[Review Video Upload] Uploading file ${i + 1}/${files.length}: ${file.name}`);
-      const result = await uploadFile(file, "reviewmedia", "reviews");
+      const result = await uploadFile(file, "reviewmedia", "video");
       
       if (result.error) {
         console.error(`[Review Video Upload] Error uploading ${file.name}:`, result.error);
@@ -1719,35 +1719,35 @@ function ProductFormContent() {
                   {/* Upload Buttons */}
                   <div className="flex gap-3 mb-4">
                     <label className="flex items-center gap-2 px-4 py-2 bg-[#F53F7A] text-white rounded-lg hover:bg-[#F53F7A]/90 cursor-pointer transition-colors">
-                      <input
-                        ref={sharedImageInputRef}
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        onChange={handleSharedImageUpload}
-                        className="hidden"
-                      />
+                              <input
+                                ref={sharedImageInputRef}
+                                type="file"
+                                accept="image/*"
+                                multiple
+                                onChange={handleSharedImageUpload}
+                                className="hidden"
+                              />
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
                       {uploadingImages ? 'Uploading...' : 'Upload Images'}
-                    </label>
+                            </label>
                     
                     <label className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 cursor-pointer transition-colors">
-                      <input
-                        ref={sharedVideoInputRef}
-                        type="file"
-                        accept="video/*"
-                        multiple
-                        onChange={handleSharedVideoUpload}
-                        className="hidden"
-                      />
+                              <input
+                                ref={sharedVideoInputRef}
+                                type="file"
+                                accept="video/*"
+                                multiple
+                                onChange={handleSharedVideoUpload}
+                                className="hidden"
+                              />
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                       </svg>
                       {uploadingVideos ? 'Uploading...' : 'Upload Videos'}
-                    </label>
-                  </div>
+                            </label>
+                          </div>
 
                   {/* Media Library Display */}
                   {(mediaLibrary.images.length > 0 || mediaLibrary.videos.length > 0) && (
@@ -1771,8 +1771,8 @@ function ProductFormContent() {
                                         </span>
                                       );
                                     })}
-                                  </div>
-                                </div>
+                        </div>
+                      </div>
                                 <button
                                   type="button"
                                   onClick={() => removeMediaFromLibrary(media.url, 'image')}
@@ -1783,7 +1783,7 @@ function ProductFormContent() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                   </svg>
                                 </button>
-                              </div>
+                    </div>
                             ))}
                           </div>
                         </div>
@@ -1791,7 +1791,7 @@ function ProductFormContent() {
 
                       {/* Videos Section */}
                       {mediaLibrary.videos.length > 0 && (
-                        <div>
+                    <div>
                           <h4 className="text-sm font-semibold text-gray-700 mb-2">Videos in Library</h4>
                           <div className="space-y-2">
                             {mediaLibrary.videos.map((media, idx) => (
@@ -1810,19 +1810,19 @@ function ProductFormContent() {
                                     })}
                                   </div>
                                 </div>
-                                <button
-                                  type="button"
+                      <button
+                        type="button"
                                   onClick={() => removeMediaFromLibrary(media.url, 'video')}
                                   className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
                                   title="Remove from library"
-                                >
+                      >
                                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                   </svg>
-                                </button>
-                              </div>
+                      </button>
+                    </div>
                             ))}
-                          </div>
+                  </div>
                         </div>
                       )}
                     </div>
@@ -2542,13 +2542,13 @@ function ProductFormContent() {
                         </svg>
                         Template
                       </a>
-                      <button
-                        type="button"
-                        onClick={() => setShowReviewsSection(!showReviewsSection)}
-                        className="text-sm text-[#F53F7A] hover:text-[#F53F7A]/80 font-medium"
-                      >
-                        {showReviewsSection ? "Hide Reviews" : "Show Reviews"}
-                      </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowReviewsSection(!showReviewsSection)}
+                      className="text-sm text-[#F53F7A] hover:text-[#F53F7A]/80 font-medium"
+                    >
+                      {showReviewsSection ? "Hide Reviews" : "Show Reviews"}
+                    </button>
                     </div>
                   </div>
 
@@ -2592,15 +2592,15 @@ function ProductFormContent() {
                               className="border border-gray-200 rounded-lg p-4 bg-white hover:shadow-sm transition-shadow relative"
                             >
                               {/* Delete Button */}
-                              <button
-                                type="button"
-                                onClick={() => removeReview(index)}
+                                  <button
+                                    type="button"
+                                    onClick={() => removeReview(index)}
                                 className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-md z-10"
-                              >
+                                  >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                              </button>
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                  </button>
 
                               {/* Horizontal Layout - All in One Row */}
                               <div className="flex items-start gap-4">
@@ -2609,17 +2609,17 @@ function ProductFormContent() {
                                   <span className="text-sm font-bold text-gray-900 bg-gray-100 px-2 py-1 rounded">
                                     #{index + 1}
                                   </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => toggleReviewVerification(index)}
+                                <button
+                                  type="button"
+                                  onClick={() => toggleReviewVerification(index)}
                                     className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
-                                      review.is_verified
+                                    review.is_verified
                                         ? "bg-green-100 text-green-700"
-                                        : "bg-gray-100 text-gray-600"
-                                    }`}
-                                  >
-                                    {review.is_verified ? "✓" : "○"}
-                                  </button>
+                                      : "bg-gray-100 text-gray-600"
+                                  }`}
+                                >
+                                  {review.is_verified ? "✓" : "○"}
+                                </button>
                                 </div>
 
                                 {/* Profile Picture */}
@@ -2676,38 +2676,38 @@ function ProductFormContent() {
                                       className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#F53F7A]"
                                     />
                                   </div>
-                                </div>
+                                  </div>
 
-                                {/* Rating */}
+                                  {/* Rating */}
                                 <div className="flex flex-col gap-1 flex-shrink-0">
                                   <label className="text-xs font-medium text-gray-700">Rating</label>
-                                  <div className="flex items-center gap-1">
-                                    {[1, 2, 3, 4, 5].map((star) => (
-                                      <button
-                                        key={star}
-                                        type="button"
-                                        onClick={() => updateReview(index, "rating", star)}
+                                    <div className="flex items-center gap-1">
+                                      {[1, 2, 3, 4, 5].map((star) => (
+                                        <button
+                                          key={star}
+                                          type="button"
+                                          onClick={() => updateReview(index, "rating", star)}
                                         className={`text-xl hover:scale-110 transition-transform ${
-                                          star <= review.rating ? "text-yellow-400" : "text-gray-300"
-                                        }`}
-                                      >
-                                        ★
-                                      </button>
-                                    ))}
+                                            star <= review.rating ? "text-yellow-400" : "text-gray-300"
+                                          }`}
+                                        >
+                                          ★
+                                        </button>
+                                      ))}
+                                    </div>
                                   </div>
-                                </div>
 
-                                {/* Comment */}
+                                  {/* Comment */}
                                 <div className="flex-1 min-w-[200px]">
                                   <label className="text-xs font-medium text-gray-700 block mb-1">Comment</label>
                                   <textarea
-                                    value={review.comment}
-                                    onChange={(e) => updateReview(index, "comment", e.target.value)}
+                                      value={review.comment}
+                                      onChange={(e) => updateReview(index, "comment", e.target.value)}
                                     rows={3}
                                     className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#F53F7A] resize-none"
                                     placeholder="Review comment..."
-                                  />
-                                </div>
+                                    />
+                                  </div>
 
                                 {/* Review Images */}
                                 <div className="flex flex-col gap-1">
@@ -2719,28 +2719,28 @@ function ProductFormContent() {
                                           src={url}
                                           alt={`Review ${index + 1} Image ${imgIdx + 1}`}
                                           className="h-14 w-14 rounded object-cover border border-gray-300 hover:border-[#F53F7A] transition-colors"
-                                        />
-                                        <button
-                                          type="button"
+                                          />
+                                          <button
+                                            type="button"
                                           onClick={() => removeReviewMediaImage(index, imgIdx)}
-                                          className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs hover:bg-red-600"
-                                        >
-                                          ×
-                                        </button>
-                                      </div>
+                                            className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs hover:bg-red-600"
+                                          >
+                                            ×
+                                          </button>
+                                        </div>
                                     ))}
                                     <label className="h-14 w-14 flex items-center justify-center border border-dashed border-gray-300 rounded text-gray-400 hover:border-[#F53F7A] hover:text-[#F53F7A] cursor-pointer transition-colors">
-                                      <input
-                                        type="file"
-                                        accept="image/*"
+                                          <input
+                                            type="file"
+                                            accept="image/*"
                                         multiple
                                         onChange={(e) => handleReviewMediaImageUpload(index, e)}
-                                        className="hidden"
-                                      />
+                                            className="hidden"
+                                          />
                                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                                       </svg>
-                                    </label>
+                                        </label>
                                   </div>
                                 </div>
 
@@ -2765,7 +2765,7 @@ function ProductFormContent() {
                                       </div>
                                     ))}
                                     <label className="h-14 w-14 flex items-center justify-center border border-dashed border-gray-300 rounded text-gray-400 hover:border-purple-600 hover:text-purple-600 cursor-pointer transition-colors">
-                                      <input
+                                        <input
                                         type="file"
                                         accept="video/*"
                                         multiple
@@ -2776,16 +2776,16 @@ function ProductFormContent() {
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                                       </svg>
                                     </label>
+                                      </div>
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            </div>
                           ))}
-                        </div>
+                              </div>
                       )}
-                    </div>
+                            </div>
                   )}
-                </div>
+                        </div>
               </div>
             </div>
           </div>
@@ -2970,7 +2970,7 @@ function ProductFormContent() {
                   <p className="text-sm text-green-800">
                     <span className="font-semibold">{selectedSizesForMedia.length}</span> size(s) selected
                   </p>
-                </div>
+            </div>
               )}
 
               {/* Action Buttons */}
@@ -3000,9 +3000,9 @@ function ProductFormContent() {
                   </svg>
                   Assign to Selected Sizes
                 </button>
-              </div>
-            </div>
           </div>
+        </div>
+      </div>
         </div>
       )}
 
