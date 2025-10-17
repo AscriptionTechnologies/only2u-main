@@ -16,6 +16,7 @@ type Product = {
   featured_type?: "trending" | "best_seller" | null;
   like_count?: number;
   return_policy?: string;
+  vendor_id?: string;
   vendor_name?: string;
   alias_vendor?: string;
   variants?: ProductVariant[];
@@ -103,6 +104,7 @@ function ProductFormContent() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [colors, setColors] = useState<Color[]>([]);
   const [sizes, setSizes] = useState<Size[]>([]);
+  const [vendors, setVendors] = useState<{ id: string; name: string }[]>([]);
   const [uploadingImages, setUploadingImages] = useState(false);
   const [uploadingVideos, setUploadingVideos] = useState(false);
   const [failedImages, setFailedImages] = useState<Set<number>>(new Set());
@@ -128,6 +130,7 @@ function ProductFormContent() {
     description: "",
     category_id: "",
     return_policy: "",
+    vendor_id: "",
     vendor_name: "",
     alias_vendor: "",
     is_active: true,
@@ -173,6 +176,7 @@ function ProductFormContent() {
         fetchCategories(),
         fetchColors(),
         fetchSizes(),
+        fetchVendors(),
         productId ? fetchProduct() : Promise.resolve(),
       ]);
 
@@ -234,6 +238,24 @@ function ProductFormContent() {
     }
   };
 
+  const fetchVendors = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("users")
+        .select("id, name")
+        .eq("role", "vendor")
+        .eq("is_active", true)
+        .order("name", { ascending: true });
+      if (error) {
+        console.error("Error fetching vendors:", error);
+        return;
+      }
+      setVendors(data || []);
+    } catch (error) {
+      console.error("Error fetching vendors:", error);
+    }
+  };
+
   const fetchProduct = async () => {
     if (!productId) {
       console.log("No productId provided for fetchProduct");
@@ -256,6 +278,7 @@ function ProductFormContent() {
           featured_type,
           like_count,
           return_policy,
+          vendor_id,
           vendor_name,
           alias_vendor,
           variants:product_variants(
@@ -305,6 +328,7 @@ function ProductFormContent() {
         description: product.description,
         category_id: product.category_id,
         return_policy: product.return_policy || "",
+        vendor_id: product.vendor_id || "",
         vendor_name: product.vendor_name || "",
         alias_vendor: product.alias_vendor || "",
         is_active: product.is_active,
@@ -612,6 +636,7 @@ function ProductFormContent() {
         description: formData.description.trim(),
         category_id: formData.category_id,
         return_policy: formData.return_policy,
+        vendor_id: formData.vendor_id || null,
         vendor_name: formData.vendor_name,
         alias_vendor: formData.alias_vendor,
         is_active: formData.is_active,
@@ -2427,20 +2452,33 @@ function ProductFormContent() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Vendor Name
+                          Select Vendor <span className="text-red-500">*</span>
                         </label>
-                        <input
-                          type="text"
-                          value={formData.vendor_name}
-                          onChange={(e) =>
+                        <select
+                          value={formData.vendor_id}
+                          onChange={(e) => {
+                            const selectedVendor = vendors.find(v => v.id === e.target.value);
                             setFormData({
                               ...formData,
-                              vendor_name: e.target.value,
-                            })
-                          }
+                              vendor_id: e.target.value,
+                              vendor_name: selectedVendor?.name || "",
+                            });
+                          }}
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
-                          placeholder="Enter vendor name"
-                        />
+                          required
+                        >
+                          <option value="">-- Select Vendor --</option>
+                          {vendors.map((vendor) => (
+                            <option key={vendor.id} value={vendor.id}>
+                              {vendor.name}
+                            </option>
+                          ))}
+                        </select>
+                        {vendors.length === 0 && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            No active vendors found. Please add vendors first.
+                          </p>
+                        )}
                       </div>
 
                       <div>
@@ -2457,7 +2495,7 @@ function ProductFormContent() {
                             })
                           }
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
-                          placeholder="Enter alias vendor"
+                          placeholder="Enter alias vendor name (optional)"
                         />
                       </div>
                     </div>
