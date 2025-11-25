@@ -60,7 +60,9 @@ type ProductVariant = {
 export default function CategoryProducts() {
   const params = useParams();
   const router = useRouter();
-  const categoryId = params.categoryId as string;
+  const categoryId = Array.isArray((params as any)?.categoryId)
+    ? ((params as any)?.categoryId[0] as string | undefined)
+    : ((params as any)?.categoryId as string | undefined);
   
   const [category, setCategory] = useState<Category | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -93,19 +95,23 @@ export default function CategoryProducts() {
   };
 
   useEffect(() => {
-    if (categoryId) {
-      fetchCategory();
-      fetchCategoryProducts();
-      fetchVendors();
+    if (!categoryId) {
+      setLoading(false);
+      setLoadingProducts(false);
+      return;
     }
+
+    fetchCategory(categoryId);
+    fetchCategoryProducts(categoryId);
+    fetchVendors();
   }, [categoryId]);
 
-  const fetchCategory = async () => {
+  const fetchCategory = async (id: string) => {
     try {
       const { data, error } = await supabase
         .from('categories')
         .select('*')
-        .eq('id', categoryId)
+        .eq('id', id)
         .single();
       if (error) {
         console.error('Error fetching category:', error);
@@ -119,7 +125,7 @@ export default function CategoryProducts() {
     }
   };
 
-  const fetchCategoryProducts = async () => {
+  const fetchCategoryProducts = async (id: string) => {
     try {
       setLoadingProducts(true);
       const { data, error } = await supabase
@@ -157,7 +163,7 @@ export default function CategoryProducts() {
             size:sizes(name)
           )
         `)
-        .eq('category_id', categoryId)
+        .eq('category_id', id)
         .order('created_at', { ascending: false });
       if (error) {
         console.log(error), 'error';
@@ -412,10 +418,12 @@ export default function CategoryProducts() {
   };
 
   const handleEditProduct = (product: Product) => {
+    if (!categoryId) return;
     router.push(`/admin/ProductForm?edit=${product.id}&category=${categoryId}`);
   };
 
   const handleAddProduct = () => {
+    if (!categoryId) return;
     router.push(`/admin/ProductForm?category=${categoryId}`);
   };
 
@@ -430,7 +438,9 @@ export default function CategoryProducts() {
         console.error('Error deleting product:', error);
         return;
       }
-      fetchCategoryProducts();
+      if (categoryId) {
+        fetchCategoryProducts(categoryId);
+      }
     } catch (error) {
       console.error('Error deleting product:', error);
     }
@@ -449,7 +459,9 @@ export default function CategoryProducts() {
         console.error('Error updating product status:', error);
         return;
       }
-      fetchCategoryProducts();
+      if (categoryId) {
+        fetchCategoryProducts(categoryId);
+      }
     } catch (error) {
       console.error('Error updating product status:', error);
     }
