@@ -1,0 +1,15 @@
+{
+  "functions": {
+    "pages/api/upload/bunny.ts": {
+      "maxDuration": 120,
+      "memory": 1024
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/upload/bunny",
+      "destination": "/api/upload/bunny"
+    }
+  ]
+}
+

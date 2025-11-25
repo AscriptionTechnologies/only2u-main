@@ -1,0 +1,51 @@
+# Copy this file to .env.local and fill in your actual values
+# NEVER commit .env.local to git!
+
+# ============================================
+# BUNNY STREAM CONFIGURATION (Required for videos)
+# ============================================
+# Create a Stream library in https://dashboard.bunny.net/stream
+# Values can be found inside the library's Settings tab
+
+BUNNY_STREAM_LIBRARY_ID=your-library-id
+BUNNY_STREAM_API_KEY=your-stream-api-key
+# Optional: auto-assign videos to a collection
+BUNNY_STREAM_COLLECTION_ID=optional-collection-id
+# Playback domain (e.g. https://vz-yourpullzone.b-cdn.net)
+BUNNY_STREAM_PLAYBACK_BASE_URL=https://your-playback-domain
+
+# ============================================
+# BUNNY STORAGE CONFIGURATION (Required for images)
+# ============================================
+# Create a storage zone + pull zone in https://dashboard.bunny.net/storage
+
+BUNNY_STORAGE_ZONE=your-storage-zone-name
+BUNNY_STORAGE_API_KEY=your-storage-api-key
+# Public base URL of the pull zone serving the storage content
+BUNNY_STORAGE_BASE_URL=https://your-pull-zone.b-cdn.net
+
+# ============================================
+# SUPABASE CONFIGURATION (Existing)
+# ============================================
+# These should already be configured
+
+NEXT_PUBLIC_SUPABASE_URL=https://ljnheixbsweamlbntwvh.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key-here
+
+# ============================================
+# HOW TO USE
+# ============================================
+# 1. Create a file named .env.local in the project root
+# 2. Copy this template into .env.local
+# 3. Replace all "your-xxx-here" with your actual values
+# 4. Save the file
+# 5. Restart your development server (npm run dev)
+
+# ============================================
+# SECURITY REMINDERS
+# ============================================
+# ✓ .env.local is already in .gitignore
+# ✓ Never commit credentials to git
+# ✓ Never share your API secrets publicly
+# ✓ Use different credentials for production
+

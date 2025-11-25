@@ -1,0 +1,126 @@
+========================================
+MOBILE APP HOME SCREEN REORDERING
+Quick Reference Guide
+========================================
+
+WHAT YOU CAN CONTROL:
+1. Section Order (Best Sellers, Trending, Categories) - which section shows first
+2. Category Order - order of categories within Categories section
+
+========================================
+HOW TO REORDER HOME SCREEN SECTIONS
+========================================
+
+WHERE: Inventory Management → "Home Screen Order" tab
+
+WHAT YOU'LL SEE:
+- 3 colored cards (Purple=Best Sellers, Blue=Trending, Green=Categories)
+- Each card has ≡ drag handle on left
+- Current order shown at top
+
+HOW TO REORDER:
+1. Click and hold ≡ icon
+2. Drag card up or down
+3. Drop in new position
+4. Auto-saves!
+
+EXAMPLE:
+Want Trending first?
+→ Drag blue "Trending Now" card to top
+→ Mobile app now shows Trending first
+
+========================================
+HOW TO REORDER CATEGORIES
+========================================
+
+WHERE: Inventory Management → "Categories" tab
+
+HOW TO REORDER:
+1. Find category to move
+2. Click and hold ≡ icon on left
+3. Drag up or down
+4. Drop in position
+5. Auto-saves!
+
+EXAMPLE:
+Want "New Arrivals" first?
+→ Drag "New Arrivals" to top
+→ Mobile app shows it first in categories
+
+========================================
+MOBILE APP INTEGRATION
+========================================
+
+FETCH SECTIONS IN ORDER:
+```
+SELECT * FROM feature_sections
+WHERE is_active = true
+ORDER BY display_order ASC;
+```
+
+FETCH CATEGORIES IN ORDER:
+```
+SELECT * FROM categories
+WHERE is_active = true
+ORDER BY display_order ASC;
+```
+
+RENDER HOME SCREEN:
+Loop through sections in order:
+- If section_type = 'best_seller' → Show Best Sellers
+- If section_type = 'trending' → Show Trending
+- If section_type = 'categories' → Show Categories
+
+========================================
+SETUP (ONE TIME ONLY)
+========================================
+
+RUN IN SUPABASE SQL EDITOR:
+1. migrations/001_add_display_order_to_categories.sql
+2. migrations/005_create_feature_type_ordering.sql
+
+THEN:
+- Restart admin panel
+- Feature ready to use!
+
+========================================
+DEFAULT ORDER
+========================================
+
+Home Screen Sections (top to bottom):
+1. ⭐ Best Sellers
+2. 🔥 Trending Now
+3. 📦 Categories
+
+You can change this to any order you want!
+
+========================================
+QUICK EXAMPLES
+========================================
+
+SCENARIO: "Make Trending show first"
+SOLUTION: Home Screen Order tab → Drag Trending to top
+
+SCENARIO: "Reorder categories"
+SOLUTION: Categories tab → Drag categories to desired order
+
+SCENARIO: "Hide Trending section"
+SOLUTION: Home Screen Order tab → Click "Hide" on Trending
+
+========================================
+TROUBLESHOOTING
+========================================
+
+Problem: Can't drag
+Fix: Run migrations in Supabase, refresh browser
+
+Problem: Changes don't save
+Fix: Check browser console, verify Supabase connection
+
+Problem: Mobile app unchanged
+Fix: Pull to refresh in app, verify ORDER BY in queries
+
+========================================
+
+For complete details, see COMPLETE_REORDERING_GUIDE.md
+
