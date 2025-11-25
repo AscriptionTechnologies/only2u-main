@@ -23,9 +23,10 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const pathname = usePathname();
+  const safePath = pathname ?? "";
 
   // Extract the page key after /admin/
-  const pageKey = pathname.split("/admin/")[1]?.split("/")[0] || "";
+  const pageKey = safePath.split("/admin/")[1]?.split("/")[0] || "";
 
   // Use the mapped title or fallback
   const pageName = pageTitleMap[pageKey] || "Admin Panel";

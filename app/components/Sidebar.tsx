@@ -25,7 +25,7 @@ const Sidebar = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const router = useRouter();
   const path = usePathname();
-  const pageName = path.split("/").pop();
+  const pageName = (path ?? "").split("/").pop();
 
   const menuItems = [
     {

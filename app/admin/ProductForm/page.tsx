@@ -99,8 +99,8 @@ type Review = {
 function ProductFormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const productId = searchParams.get("edit");
-  const categoryId = searchParams.get("category");
+  const productId = searchParams?.get("edit") ?? null;
+  const categoryId = searchParams?.get("category") ?? null;
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
