@@ -1,5 +1,6 @@
 /**
- * Upload file to Bunny (Stream for videos, Storage for images) via API route
+ * Upload file to Bunny (Stream for videos, Storage for images)
+ * For files >4MB, uploads directly to Bunny to bypass Vercel limits
  * @param file - The file to upload
  * @param folder - Folder prefix used when saving assets
  * @param resourceType - Desired resource type ('image', 'video', or auto-detected)
@@ -35,29 +36,37 @@ export const uploadFile = async (
       };
     }
 
+    // For files >4MB, upload directly to Bunny to bypass Vercel's 4.5MB body limit
+    const VERCEL_SAFE_SIZE = 4 * 1024 * 1024; // 4MB
+    const isVideo = file.type.startsWith('video/');
+    
+    if (file.size > VERCEL_SAFE_SIZE) {
+      // Direct upload to Bunny (client-side)
+      return isVideo 
+        ? await uploadVideoDirectToBunny(file, folder)
+        : await uploadImageDirectToBunny(file, folder);
+    }
+
+    // For smaller files, use our API route
     const formData = new FormData();
     formData.append('file', file);
     formData.append('folder', folder);
     formData.append('resourceType', resourceType);
 
-    // Upload via Bunny API route
     const response = await fetch('/api/upload/bunny', {
       method: 'POST',
       body: formData,
     });
 
-    // Check if response is JSON
     const contentType = response.headers.get('content-type');
     let result;
     
     if (contentType && contentType.includes('application/json')) {
       result = await response.json();
     } else {
-      // If not JSON, it's likely an error page or text response
       const text = await response.text();
       console.error('Non-JSON response from upload API:', text.substring(0, 200));
       
-      // Check for common error patterns
       if (text.includes('Request Entity Too Large') || text.includes('413')) {
         return {
           url: '',
@@ -92,6 +101,120 @@ export const uploadFile = async (
     };
   }
 };
+
+/**
+ * Upload video directly to Bunny Stream (bypasses Vercel)
+ */
+async function uploadVideoDirectToBunny(
+  file: File,
+  folder: string
+): Promise<{ url: string; error: string | null; public_id?: string }> {
+  try {
+    // Get upload credentials from our API
+    const credResponse = await fetch('/api/upload/bunny/credentials', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        type: 'video',
+        filename: file.name,
+        folder 
+      }),
+    });
+
+    if (!credResponse.ok) {
+      const error = await credResponse.json();
+      throw new Error(error.error || 'Failed to get upload credentials');
+    }
+
+    const { libraryId, videoGuid, uploadUrl, apiKey } = await credResponse.json();
+
+    // Upload directly to Bunny Stream
+    const uploadResponse = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: {
+        'AccessKey': apiKey,
+        'Content-Type': 'application/octet-stream',
+      },
+      body: file,
+    });
+
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text();
+      throw new Error(`Failed to upload to Bunny Stream: ${errorText}`);
+    }
+
+    // Return the playback URL
+    const playbackBase = `https://iframe.mediadelivery.net/embed/${libraryId}`;
+    const url = `${playbackBase}/${videoGuid}`;
+
+    return {
+      url,
+      public_id: videoGuid,
+      error: null,
+    };
+  } catch (error: any) {
+    console.error('Direct video upload error:', error);
+    return {
+      url: '',
+      error: error.message || 'Failed to upload video directly to Bunny',
+    };
+  }
+}
+
+/**
+ * Upload image directly to Bunny Storage (bypasses Vercel)
+ */
+async function uploadImageDirectToBunny(
+  file: File,
+  folder: string
+): Promise<{ url: string; error: string | null; public_id?: string }> {
+  try {
+    // Get upload credentials from our API
+    const credResponse = await fetch('/api/upload/bunny/credentials', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        type: 'image',
+        filename: file.name,
+        folder 
+      }),
+    });
+
+    if (!credResponse.ok) {
+      const error = await credResponse.json();
+      throw new Error(error.error || 'Failed to get upload credentials');
+    }
+
+    const { uploadUrl, publicUrl, objectName, apiKey } = await credResponse.json();
+
+    // Upload directly to Bunny Storage
+    const uploadResponse = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: {
+        'AccessKey': apiKey,
+        'Content-Type': file.type || 'application/octet-stream',
+      },
+      body: file,
+    });
+
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text();
+      throw new Error(`Failed to upload to Bunny Storage: ${errorText}`);
+    }
+
+    return {
+      url: publicUrl,
+      public_id: objectName,
+      error: null,
+    };
+  } catch (error: any) {
+    console.error('Direct image upload error:', error);
+    return {
+      url: '',
+      error: error.message || 'Failed to upload image directly to Bunny',
+    };
+  }
+}
 
 /**
  * Delete file from Bunny via API route
