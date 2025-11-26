@@ -105,7 +105,8 @@ const uploadToBunnyStorage = async (file: FormidableFile, folder: string): Promi
       'Content-Type': file.mimetype || 'application/octet-stream',
     },
     body: stream as any,
-  });
+    duplex: 'half',
+  } as RequestInit & { duplex: 'half' });
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -156,7 +157,8 @@ const createBunnyStreamVideo = async (file: FormidableFile, folder: string): Pro
         'Content-Type': 'application/octet-stream',
       },
       body: stream as any,
-    }
+      duplex: 'half',
+    } as RequestInit & { duplex: 'half' }
   );
 
   if (!uploadResponse.ok) {
