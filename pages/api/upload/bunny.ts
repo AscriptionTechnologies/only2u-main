@@ -169,7 +169,7 @@ const createBunnyStreamVideo = async (file: FormidableFile, folder: string): Pro
   // Always return HLS playlist URL for React Native compatibility
   // Format: https://vz-xxxxx.b-cdn.net/{videoGuid}/playlist.m3u8
   const playbackBase = (BUNNY_STREAM_PLAYBACK_BASE_URL || '').replace(/\/$/, '') || 
-                       `https://vz-${BUNNY_STREAM_LIBRARY_ID}.b-cdn.net`;
+                       `https://vz-025b9bde-754.b-cdn.net`;
   const url = `${playbackBase}/${createPayload.guid}/playlist.m3u8`;
 
   return {
