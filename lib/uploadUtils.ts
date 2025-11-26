@@ -144,8 +144,8 @@ async function uploadVideoDirectToBunny(
     }
 
     // Return HLS playlist URL for React Native video players
-    // Bunny Stream URL format: https://vz-{libraryId}.b-cdn.net/{videoGuid}/playlist.m3u8
-    const playbackBase = `https://vz-${libraryId}.b-cdn.net`;
+    // Bunny Stream URL format: https://vz-025b9bde-754.b-cdn.net/{videoGuid}/playlist.m3u8
+    const playbackBase = `https://vz-025b9bde-754.b-cdn.net`;
     const url = `${playbackBase}/${videoGuid}/playlist.m3u8`;
 
     return {
