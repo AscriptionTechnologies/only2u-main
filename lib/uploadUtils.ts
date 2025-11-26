@@ -11,15 +11,15 @@ export const uploadFile = async (
   resourceType: string = 'auto'
 ): Promise<{ url: string; error: string | null; public_id?: string }> => {
   try {
-    // Validate file size (max 10MB for images, 100MB for videos)
+    // Validate file size (max 25MB for images, 500MB for videos)
     const maxSize = file.type.startsWith('video/') 
-      ? 100 * 1024 * 1024 
-      : 10 * 1024 * 1024;
+      ? 500 * 1024 * 1024 
+      : 25 * 1024 * 1024;
     
     if (file.size > maxSize) {
       return {
         url: '',
-        error: `File size too large. Maximum size is ${maxSize / (1024 * 1024)}MB`
+        error: `File size too large. Maximum allowed: ${maxSize / (1024 * 1024)}MB (current file: ${(file.size / (1024 * 1024)).toFixed(2)}MB)`
       };
     }
 
