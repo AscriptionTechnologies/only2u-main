@@ -166,13 +166,11 @@ const createBunnyStreamVideo = async (file: FormidableFile, folder: string): Pro
     throw new Error(`Failed to upload video to Bunny Stream: ${errorText}`);
   }
 
-  const playbackBase =
-    (BUNNY_STREAM_PLAYBACK_BASE_URL || '').replace(/\/$/, '') ||
-    `https://iframe.mediadelivery.net/embed/${BUNNY_STREAM_LIBRARY_ID}`;
-
-  const url = playbackBase.includes('mediadelivery.net/embed')
-    ? `${playbackBase}/${createPayload.guid}`
-    : `${playbackBase}/${createPayload.guid}/playlist.m3u8`;
+  // Always return HLS playlist URL for React Native compatibility
+  // Format: https://vz-xxxxx.b-cdn.net/{videoGuid}/playlist.m3u8
+  const playbackBase = (BUNNY_STREAM_PLAYBACK_BASE_URL || '').replace(/\/$/, '') || 
+                       `https://vz-${BUNNY_STREAM_LIBRARY_ID}.b-cdn.net`;
+  const url = `${playbackBase}/${createPayload.guid}/playlist.m3u8`;
 
   return {
     url,

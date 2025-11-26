@@ -143,9 +143,11 @@ async function uploadVideoDirectToBunny(
       throw new Error(`Failed to upload to Bunny Stream: ${errorText}`);
     }
 
-    // Return the playback URL
-    const playbackBase = `https://iframe.mediadelivery.net/embed/${libraryId}`;
-    const url = `${playbackBase}/${videoGuid}`;
+    // Return HLS playlist URL for React Native video players
+    // Format: https://vz-xxxxx.b-cdn.net/{videoGuid}/playlist.m3u8
+    const playbackBase = process.env.NEXT_PUBLIC_BUNNY_STREAM_PLAYBACK_BASE_URL || 
+                         `https://vz-${libraryId}.b-cdn.net`;
+    const url = `${playbackBase.replace(/\/$/, '')}/${videoGuid}/playlist.m3u8`;
 
     return {
       url,
