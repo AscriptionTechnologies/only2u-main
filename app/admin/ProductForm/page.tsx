@@ -20,6 +20,7 @@ type Product = {
   vendor_id?: string;
   vendor_name?: string;
   alias_vendor?: string;
+  influencer_id?: string | null;
   tax_type?: "IGST" | "SGST" | null;
   tax_rate?: number;
   variants?: ProductVariant[];
@@ -110,6 +111,7 @@ function ProductFormContent() {
   const [vendors, setVendors] = useState<{ id: string; business_name: string; profile_image_url?: string; location?: string }[]>([]);
   const [showVendorModal, setShowVendorModal] = useState(false);
   const [vendorSearch, setVendorSearch] = useState("");
+  const [influencers, setInfluencers] = useState<{ id: string; name: string; username: string; is_verified: boolean }[]>([]);
   const [uploadingImages, setUploadingImages] = useState(false);
   const [uploadingVideos, setUploadingVideos] = useState(false);
   const [failedImages, setFailedImages] = useState<Set<number>>(new Set());
@@ -139,6 +141,7 @@ function ProductFormContent() {
     vendor_id: "",
     vendor_name: "",
     alias_vendor: "",
+    influencer_id: "",
     is_active: true,
     featured_type: null as "trending" | "best_seller" | null,
     tax_type: null as "IGST" | "SGST" | null,
@@ -185,6 +188,7 @@ function ProductFormContent() {
         fetchColors(),
         fetchSizes(),
         fetchVendors(),
+        fetchInfluencers(),
         productId ? fetchProduct() : Promise.resolve(),
       ]);
 
@@ -263,6 +267,23 @@ function ProductFormContent() {
     }
   };
 
+  const fetchInfluencers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("influencer_profiles")
+        .select("id, name, username, is_verified")
+        .eq("is_active", true)
+        .order("name");
+      if (error) {
+        console.error("Error fetching influencers:", error);
+        return;
+      }
+      setInfluencers(data || []);
+    } catch (error) {
+      console.error("Error fetching influencers:", error);
+    }
+  };
+
   const fetchProduct = async () => {
     if (!productId) {
       console.log("No productId provided for fetchProduct");
@@ -287,6 +308,7 @@ function ProductFormContent() {
           return_policy,
           replacement_policy_days,
           vendor_id,
+          influencer_id,
           vendor_name,
           alias_vendor,
           tax_type,
@@ -340,6 +362,7 @@ function ProductFormContent() {
         return_policy: product.return_policy || "",
         replacement_policy_days: product.replacement_policy_days ? String(product.replacement_policy_days) : "",
         vendor_id: product.vendor_id || "",
+        influencer_id: product.influencer_id || "",
         vendor_name: product.vendor_name || "",
         alias_vendor: product.alias_vendor || "",
         is_active: product.is_active,
@@ -651,6 +674,7 @@ function ProductFormContent() {
         return_policy: formData.return_policy,
         replacement_policy_days: formData.replacement_policy_days ? parseInt(formData.replacement_policy_days) : null,
         vendor_id: formData.vendor_id || null,
+        influencer_id: formData.influencer_id || null,
         vendor_name: formData.vendor_name,
         alias_vendor: formData.alias_vendor,
         is_active: formData.is_active,
@@ -2503,6 +2527,34 @@ function ProductFormContent() {
                           placeholder="Enter alias vendor name (optional)"
                         />
                       </div>
+                    </div>
+
+                    {/* Influencer Selection */}
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Featured Influencer <span className="text-gray-500">(Optional)</span>
+                      </label>
+                      <select
+                        value={formData.influencer_id}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            influencer_id: e.target.value,
+                          })
+                        }
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
+                      >
+                        <option value="">None - No influencer</option>
+                        {influencers.map((influencer) => (
+                          <option key={influencer.id} value={influencer.id}>
+                            {influencer.name} (@{influencer.username})
+                            {influencer.is_verified ? " ✓" : ""}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Select an influencer who is promoting this product
+                      </p>
                     </div>
                   </div>
 

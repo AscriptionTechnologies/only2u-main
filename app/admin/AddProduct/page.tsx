@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { supabase } from "../../../lib/supabase";
 
 interface Product {
@@ -9,10 +9,36 @@ interface Product {
   created_at: string;
 }
 
+interface Influencer {
+  id: string;
+  name: string;
+  username: string;
+  is_verified: boolean;
+  instagram_handle?: string;
+}
+
 const AddProductPage = () => {
   const [productName, setProductName] = useState("");
+  const [selectedInfluencer, setSelectedInfluencer] = useState("");
+  const [influencers, setInfluencers] = useState<Influencer[]>([]);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    fetchInfluencers();
+  }, []);
+
+  const fetchInfluencers = async () => {
+    const { data, error } = await supabase
+      .from("influencer_profiles")
+      .select("id, name, username, is_verified, instagram_handle")
+      .eq("is_active", true)
+      .order("name");
+
+    if (!error && data) {
+      setInfluencers(data as Influencer[]);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,6 +62,7 @@ const AddProductPage = () => {
           return_policy: "",
           vendor_name: "",
           alias_vendor: "",
+          influencer_id: selectedInfluencer || null,
         })
         .select("id")
         .single();
@@ -48,6 +75,7 @@ const AddProductPage = () => {
 
       setSuccess(true);
       setProductName("");
+      setSelectedInfluencer("");
       
       // Reset success message after 3 seconds
       setTimeout(() => setSuccess(false), 3000);
@@ -80,6 +108,28 @@ const AddProductPage = () => {
               />
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Featured Influencer <span className="text-gray-500">(Optional)</span>
+              </label>
+              <select
+                value={selectedInfluencer}
+                onChange={(e) => setSelectedInfluencer(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
+              >
+                <option value="">None - No influencer</option>
+                {influencers.map((influencer) => (
+                  <option key={influencer.id} value={influencer.id}>
+                    {influencer.name} (@{influencer.username})
+                    {influencer.is_verified ? " ✓" : ""}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Select an influencer who is promoting this product
+              </p>
+            </div>
+
             {success && (
               <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                 <p className="text-green-800">Product created successfully!</p>
@@ -96,7 +146,10 @@ const AddProductPage = () => {
               </button>
               <button
                 type="button"
-                onClick={() => setProductName("")}
+                onClick={() => {
+                  setProductName("");
+                  setSelectedInfluencer("");
+                }}
                 className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 Clear

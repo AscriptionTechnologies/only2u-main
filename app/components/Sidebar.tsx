@@ -16,7 +16,9 @@ import {
   Palette,
   Package,
   MessageCircle,
-  Percent
+  Percent,
+  Ticket,
+  Star
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import Logo from "./Logo";
@@ -69,6 +71,18 @@ const Sidebar = () => {
       icon: Percent,
       link: "/admin/CouponManagement",
       path: "CouponManagement",
+    },
+    {
+      name: "Referral Codes",
+      icon: Ticket,
+      link: "/admin/ReferralManagement",
+      path: "ReferralManagement",
+    },
+    {
+      name: "Influencer Profiles",
+      icon: Star,
+      link: "/admin/InfluencerProfiles",
+      path: "InfluencerProfiles",
     },
     {
       name: "Settings",
