@@ -32,14 +32,14 @@ CREATE TABLE IF NOT EXISTS referral_code_usage (
   metadata JSONB DEFAULT '{}'::jsonb -- for storing additional tracking data
 );
 
--- Create indexes for better performance
-CREATE INDEX idx_referral_codes_code ON referral_codes(code);
-CREATE INDEX idx_referral_codes_is_active ON referral_codes(is_active);
-CREATE INDEX idx_referral_codes_created_at ON referral_codes(created_at);
-CREATE INDEX idx_referral_code_usage_referral_code_id ON referral_code_usage(referral_code_id);
-CREATE INDEX idx_referral_code_usage_referral_code ON referral_code_usage(referral_code);
-CREATE INDEX idx_referral_code_usage_user_email ON referral_code_usage(user_email);
-CREATE INDEX idx_referral_code_usage_used_at ON referral_code_usage(used_at);
+-- Create indexes for better performance (idempotent)
+CREATE INDEX IF NOT EXISTS idx_referral_codes_code ON referral_codes(code);
+CREATE INDEX IF NOT EXISTS idx_referral_codes_is_active ON referral_codes(is_active);
+CREATE INDEX IF NOT EXISTS idx_referral_codes_created_at ON referral_codes(created_at);
+CREATE INDEX IF NOT EXISTS idx_referral_code_usage_referral_code_id ON referral_code_usage(referral_code_id);
+CREATE INDEX IF NOT EXISTS idx_referral_code_usage_referral_code ON referral_code_usage(referral_code);
+CREATE INDEX IF NOT EXISTS idx_referral_code_usage_user_email ON referral_code_usage(user_email);
+CREATE INDEX IF NOT EXISTS idx_referral_code_usage_used_at ON referral_code_usage(used_at);
 
 -- Function to increment usage count when a referral code is used
 CREATE OR REPLACE FUNCTION increment_referral_usage()
@@ -52,7 +52,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Trigger to auto-increment usage count
+-- Trigger to auto-increment usage count (idempotent)
+DROP TRIGGER IF EXISTS trigger_increment_referral_usage ON referral_code_usage;
 CREATE TRIGGER trigger_increment_referral_usage
 AFTER INSERT ON referral_code_usage
 FOR EACH ROW

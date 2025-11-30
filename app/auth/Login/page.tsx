@@ -50,7 +50,7 @@ const LoginPage = () => {
       // Fetch user role from the users table
       const { data: userData, error: userError } = await supabase
         .from('users')
-        .select('role')
+        .select('role, vendor_id, is_active')
         .eq('id', authData.user.id)
         .single();
 
@@ -60,13 +60,20 @@ const LoginPage = () => {
         return;
       }
 
-      // Check if user has admin role
+      // Check user role and redirect accordingly
       if (userData.role === 'admin') {
         toast.success("Login successful! Welcome admin.");
         router.push('/admin/Dashboard');
+      } else if (userData.role === 'vendor') {
+        if (!userData.is_active) {
+          toast.error("Your vendor account is inactive. Please contact support.");
+          await supabase.auth.signOut();
+          return;
+        }
+        toast.success("Login successful! Welcome vendor.");
+        router.push('/vendor/dashboard');
       } else {
-        toast.error("Access denied! Admin privileges required.");
-        // Sign out the user since they don't have admin access
+        toast.error("Access denied! Invalid user role.");
         await supabase.auth.signOut();
       }
 

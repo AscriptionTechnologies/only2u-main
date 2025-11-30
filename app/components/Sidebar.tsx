@@ -18,7 +18,9 @@ import {
   MessageCircle,
   Percent,
   Ticket,
-  Star
+  Star,
+  FileText,
+  BarChart3
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import Logo from "./Logo";
@@ -61,6 +63,12 @@ const Sidebar = () => {
       path: "VendorManagement",
     },
     {
+      name: "Vendor Registrations",
+      icon: FileCheck,
+      link: "/admin/VendorRegistrationRequests",
+      path: "VendorRegistrationRequests",
+    },
+    {
       name: "Vendor Q&A",
       icon: MessageCircle,
       link: "/admin/VendorQA",
@@ -83,6 +91,18 @@ const Sidebar = () => {
       icon: Star,
       link: "/admin/InfluencerProfiles",
       path: "InfluencerProfiles",
+    },
+    {
+      name: "Invoices & GST",
+      icon: FileText,
+      link: "/admin/InvoiceManagement",
+      path: "InvoiceManagement",
+    },
+    {
+      name: "Accounting Reports",
+      icon: BarChart3,
+      link: "/admin/AccountingReports",
+      path: "AccountingReports",
     },
     {
       name: "Settings",
