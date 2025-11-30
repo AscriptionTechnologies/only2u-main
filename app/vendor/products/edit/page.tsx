@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "../../../../lib/supabase";
 import { uploadFile } from "../../../../lib/uploadUtils";
 import Link from "next/link";
 
-export default function VendorEditProductPage() {
+function VendorEditProductContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const productId = searchParams?.get("id");
@@ -170,7 +170,20 @@ export default function VendorEditProductPage() {
     setUploadingImages(true);
     try {
       const uploadPromises = newImages.map(file => uploadFile(file, `products/${Date.now()}-${file.name}`));
-      const urls = await Promise.all(uploadPromises);
+      const results = await Promise.all(uploadPromises);
+      
+      // Extract URLs and filter out failed uploads
+      const urls: string[] = [];
+      for (const result of results) {
+        if (result.error) {
+          console.error("Upload error:", result.error);
+          throw new Error(`Failed to upload image: ${result.error}`);
+        }
+        if (result.url) {
+          urls.push(result.url);
+        }
+      }
+      
       return urls;
     } catch (error: any) {
       throw new Error(`Failed to upload images: ${error.message}`);
@@ -420,6 +433,20 @@ export default function VendorEditProductPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+export default function VendorEditProductPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex justify-center items-center h-screen">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#F53F7A]"></div>
+        </div>
+      }
+    >
+      <VendorEditProductContent />
+    </Suspense>
   );
 }
 

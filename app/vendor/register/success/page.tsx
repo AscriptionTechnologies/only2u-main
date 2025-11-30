@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { CheckCircle } from "lucide-react";
-import Logo from "../../../../components/Logo";
+import Logo from "../../../components/Logo";
 
 export default function RegistrationSuccessPage() {
   const router = useRouter();

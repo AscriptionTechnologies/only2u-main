@@ -107,7 +107,20 @@ export default function VendorAddProductPage() {
     setUploadingImages(true);
     try {
       const uploadPromises = images.map(file => uploadFile(file, `products/${Date.now()}-${file.name}`));
-      const urls = await Promise.all(uploadPromises);
+      const results = await Promise.all(uploadPromises);
+      
+      // Extract URLs and filter out failed uploads
+      const urls: string[] = [];
+      for (const result of results) {
+        if (result.error) {
+          console.error("Upload error:", result.error);
+          throw new Error(`Failed to upload image: ${result.error}`);
+        }
+        if (result.url) {
+          urls.push(result.url);
+        }
+      }
+      
       return urls;
     } catch (error: any) {
       throw new Error(`Failed to upload images: ${error.message}`);
