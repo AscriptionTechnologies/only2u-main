@@ -81,41 +81,56 @@ export function calculateTaxableValue(quantity: number, rate: number, discount: 
 }
 
 /**
- * Calculate tax amounts based on supply type
+ * Calculate tax amounts based on supply type and item price
+ * Tiered tax structure:
+ * - For items <= ₹2500:
+ *   - Interstate: 5% IGST
+ *   - Intrastate: 2.5% CGST + 2.5% SGST
+ * - For items > ₹2500:
+ *   - Interstate: 18% IGST
+ *   - Intrastate: 9% CGST + 9% SGST
  */
 export function calculateTaxes(
   taxableValue: number,
-  taxRate: number,
+  itemPrice: number, // Price per unit (before tax)
   supplyType: SupplyType
 ): { cgstRate: number; cgstAmount: number; sgstRate: number; sgstAmount: number; igstRate: number; igstAmount: number } {
-  if (supplyType === 'IntraState') {
-    // Split tax rate equally between CGST and SGST
-    const cgstRate = taxRate / 2;
-    const sgstRate = taxRate / 2;
-    const cgstAmount = (taxableValue * cgstRate) / 100;
-    const sgstAmount = (taxableValue * sgstRate) / 100;
-    
-    return {
-      cgstRate,
-      cgstAmount: Math.round(cgstAmount * 100) / 100,
-      sgstRate,
-      sgstAmount: Math.round(sgstAmount * 100) / 100,
-      igstRate: 0,
-      igstAmount: 0,
-    };
+  const PRICE_THRESHOLD = 2500;
+  
+  let cgstRate = 0;
+  let sgstRate = 0;
+  let igstRate = 0;
+  
+  if (itemPrice <= PRICE_THRESHOLD) {
+    // Low value items
+    if (supplyType === 'IntraState') {
+      cgstRate = 2.5;
+      sgstRate = 2.5;
+    } else {
+      igstRate = 5;
+    }
   } else {
-    // InterState - use IGST
-    const igstAmount = (taxableValue * taxRate) / 100;
-    
-    return {
-      cgstRate: 0,
-      cgstAmount: 0,
-      sgstRate: 0,
-      sgstAmount: 0,
-      igstRate: taxRate,
-      igstAmount: Math.round(igstAmount * 100) / 100,
-    };
+    // High value items
+    if (supplyType === 'IntraState') {
+      cgstRate = 9;
+      sgstRate = 9;
+    } else {
+      igstRate = 18;
+    }
   }
+  
+  const cgstAmount = (taxableValue * cgstRate) / 100;
+  const sgstAmount = (taxableValue * sgstRate) / 100;
+  const igstAmount = (taxableValue * igstRate) / 100;
+  
+  return {
+    cgstRate,
+    cgstAmount: Math.round(cgstAmount * 100) / 100,
+    sgstRate,
+    sgstAmount: Math.round(sgstAmount * 100) / 100,
+    igstRate,
+    igstAmount: Math.round(igstAmount * 100) / 100,
+  };
 }
 
 /**

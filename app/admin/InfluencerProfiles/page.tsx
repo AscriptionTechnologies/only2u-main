@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { supabase } from "../../../lib/supabase";
+import { uploadFile } from "../../../lib/uploadUtils";
 
 type InfluencerProfile = {
   id: string;
@@ -48,6 +49,7 @@ type FormState = {
   commission_rate: string;
   is_verified: boolean;
   is_active: boolean;
+  profile_photo: string;
 };
 
 const initialFormState: FormState = {
@@ -66,6 +68,7 @@ const initialFormState: FormState = {
   commission_rate: "10.00",
   is_verified: false,
   is_active: true,
+  profile_photo: "",
 };
 
 export default function InfluencerProfilesPage() {
@@ -78,6 +81,10 @@ export default function InfluencerProfilesPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
+  const [profilePhotoFile, setProfilePhotoFile] = useState<File | null>(null);
+  const [profilePhotoPreview, setProfilePhotoPreview] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchProfiles();
@@ -118,7 +125,10 @@ export default function InfluencerProfilesPage() {
       commission_rate: profile.commission_rate.toString(),
       is_verified: profile.is_verified,
       is_active: profile.is_active,
+      profile_photo: profile.profile_photo || "",
     });
+    setProfilePhotoPreview(profile.profile_photo || null);
+    setProfilePhotoFile(null);
     setShowForm(true);
     setError(null);
   };
@@ -127,8 +137,34 @@ export default function InfluencerProfilesPage() {
     if (submitting) return;
     setEditingProfile(null);
     setFormState(initialFormState);
+    setProfilePhotoFile(null);
+    setProfilePhotoPreview(null);
     setShowForm(false);
     setError(null);
+  };
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        setError("Please select an image file");
+        return;
+      }
+      // Validate file size (max 5MB for profile photos)
+      if (file.size > 5 * 1024 * 1024) {
+        setError("Image size must be less than 5MB");
+        return;
+      }
+      setProfilePhotoFile(file);
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfilePhotoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+      setError(null);
+    }
   };
 
   const handleFormChange = (field: keyof FormState, value: string | boolean) => {
@@ -149,6 +185,35 @@ export default function InfluencerProfilesPage() {
       return;
     }
 
+    let profilePhotoUrl = formState.profile_photo;
+
+    // Upload profile photo if a new file is selected
+    if (profilePhotoFile) {
+      setUploadingPhoto(true);
+      try {
+        const uploadResult = await uploadFile(
+          profilePhotoFile,
+          `influencers/${Date.now()}-${profilePhotoFile.name}`
+        );
+        
+        if (uploadResult.error) {
+          setError(`Failed to upload profile photo: ${uploadResult.error}`);
+          setSubmitting(false);
+          setUploadingPhoto(false);
+          return;
+        }
+        
+        profilePhotoUrl = uploadResult.url;
+      } catch (uploadError: any) {
+        setError(`Failed to upload profile photo: ${uploadError.message}`);
+        setSubmitting(false);
+        setUploadingPhoto(false);
+        return;
+      } finally {
+        setUploadingPhoto(false);
+      }
+    }
+
     const payload = {
       name: formState.name.trim(),
       username: formState.username.trim().toLowerCase(),
@@ -165,6 +230,7 @@ export default function InfluencerProfilesPage() {
       commission_rate: parseFloat(formState.commission_rate) || 10.0,
       is_verified: formState.is_verified,
       is_active: formState.is_active,
+      profile_photo: profilePhotoUrl || null,
     };
 
     try {
@@ -331,6 +397,43 @@ export default function InfluencerProfilesPage() {
             {editingProfile ? `Editing ${editingProfile.name}` : "Add New Influencer"}
           </h2>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Profile Photo Upload */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                Profile Photo
+              </label>
+              <div className="flex items-center gap-4">
+                {profilePhotoPreview && (
+                  <div className="relative">
+                    <img
+                      src={profilePhotoPreview}
+                      alt="Profile preview"
+                      className="w-20 h-20 rounded-full object-cover border-2 border-gray-200"
+                    />
+                  </div>
+                )}
+                <div className="flex-1">
+                  <input
+                    ref={photoInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePhotoChange}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => photoInputRef.current?.click()}
+                    className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition"
+                  >
+                    {profilePhotoPreview ? "Change Photo" : "Upload Photo"}
+                  </button>
+                  {profilePhotoFile && (
+                    <p className="text-xs text-gray-500 mt-1">{profilePhotoFile.name}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">
@@ -540,9 +643,15 @@ export default function InfluencerProfilesPage() {
               <button
                 type="submit"
                 className="px-4 py-2 rounded-lg bg-[#F53F7A] text-white hover:bg-[#F53F7A]/90 transition disabled:opacity-60"
-                disabled={submitting}
+                disabled={submitting || uploadingPhoto}
               >
-                {submitting ? "Saving..." : editingProfile ? "Update Profile" : "Create Profile"}
+                {submitting || uploadingPhoto
+                  ? uploadingPhoto
+                    ? "Uploading Photo..."
+                    : "Saving..."
+                  : editingProfile
+                  ? "Update Profile"
+                  : "Create Profile"}
               </button>
             </div>
           </form>
@@ -623,21 +732,36 @@ export default function InfluencerProfilesPage() {
                 filteredProfiles.map((profile) => (
                   <tr key={profile.id} className="hover:bg-gray-50 transition">
                     <td className="px-6 py-4">
-                      <div className="flex flex-col">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-semibold text-gray-900">
-                            {profile.name}
-                          </span>
-                          {profile.is_verified && (
-                            <span className="text-blue-500" title="Verified">✓</span>
+                      <div className="flex items-center gap-3">
+                        {profile.profile_photo ? (
+                          <img
+                            src={profile.profile_photo}
+                            alt={profile.name}
+                            className="w-10 h-10 rounded-full object-cover border border-gray-200"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
+                            <span className="text-gray-400 text-xs">
+                              {profile.name.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                        )}
+                        <div className="flex flex-col">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold text-gray-900">
+                              {profile.name}
+                            </span>
+                            {profile.is_verified && (
+                              <span className="text-blue-500" title="Verified">✓</span>
+                            )}
+                          </div>
+                          <span className="text-xs text-gray-500">@{profile.username}</span>
+                          {profile.influencer_code && (
+                            <span className="text-xs font-mono text-[#F53F7A] mt-1">
+                              {profile.influencer_code}
+                            </span>
                           )}
                         </div>
-                        <span className="text-xs text-gray-500">@{profile.username}</span>
-                        {profile.influencer_code && (
-                          <span className="text-xs font-mono text-[#F53F7A] mt-1">
-                            {profile.influencer_code}
-                          </span>
-                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm">

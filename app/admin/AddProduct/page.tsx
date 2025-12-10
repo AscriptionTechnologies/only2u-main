@@ -17,15 +17,26 @@ interface Influencer {
   instagram_handle?: string;
 }
 
+interface Fabric {
+  id: string;
+  name: string;
+  code?: string;
+  is_active: boolean;
+}
+
 const AddProductPage = () => {
   const [productName, setProductName] = useState("");
+  const [hsnCode, setHsnCode] = useState("");
   const [selectedInfluencer, setSelectedInfluencer] = useState("");
+  const [selectedFabric, setSelectedFabric] = useState("");
   const [influencers, setInfluencers] = useState<Influencer[]>([]);
+  const [fabrics, setFabrics] = useState<Fabric[]>([]);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
     fetchInfluencers();
+    fetchFabrics();
   }, []);
 
   const fetchInfluencers = async () => {
@@ -40,11 +51,28 @@ const AddProductPage = () => {
     }
   };
 
+  const fetchFabrics = async () => {
+    const { data, error } = await supabase
+      .from("fabrics")
+      .select("id, name, code, is_active")
+      .eq("is_active", true)
+      .order("name");
+
+    if (!error && data) {
+      setFabrics(data as Fabric[]);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!productName.trim()) {
       alert("Please enter a product name");
+      return;
+    }
+    
+    if (!hsnCode.trim()) {
+      alert("Please enter an HSN code");
       return;
     }
 
@@ -63,6 +91,8 @@ const AddProductPage = () => {
           vendor_name: "",
           alias_vendor: "",
           influencer_id: selectedInfluencer || null,
+          hsn_code: hsnCode.trim() || null,
+          fabric_id: selectedFabric || null,
         })
         .select("id")
         .single();
@@ -75,7 +105,9 @@ const AddProductPage = () => {
 
       setSuccess(true);
       setProductName("");
+      setHsnCode("");
       setSelectedInfluencer("");
+      setSelectedFabric("");
       
       // Reset success message after 3 seconds
       setTimeout(() => setSuccess(false), 3000);
@@ -106,6 +138,24 @@ const AddProductPage = () => {
                 placeholder="Enter product name"
                 required
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                HSN Code <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={hsnCode}
+                onChange={(e) => setHsnCode(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
+                placeholder="e.g., 6109, 6203, 5007"
+                maxLength={20}
+                required
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                HSN (Harmonized System of Nomenclature) code for GST compliance (Required)
+              </p>
             </div>
 
             <div>
@@ -148,7 +198,9 @@ const AddProductPage = () => {
                 type="button"
                 onClick={() => {
                   setProductName("");
+                  setHsnCode("");
                   setSelectedInfluencer("");
+                  setSelectedFabric("");
                 }}
                 className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
               >

@@ -121,7 +121,7 @@ const OrderManagementPage = () => {
           product:products(
             tax_type,
             tax_rate,
-            category:categories(hsn_code)
+            hsn_code
           )
         `);
 
@@ -137,7 +137,7 @@ const OrderManagementPage = () => {
           (item: any) => item.order_id === order.id
         ).map((item: any) => ({
           ...item,
-          hsn_code: item.product?.category?.hsn_code || null,
+          hsn_code: item.hsn_code || item.product?.hsn_code || null,
           tax_type: item.product?.tax_type || null,
           tax_rate: item.product?.tax_rate || null,
         }));
@@ -886,7 +886,7 @@ const OrderManagementPage = () => {
                       product:products(
                         tax_type,
                         tax_rate,
-                        category:categories(hsn_code)
+                        hsn_code
                       )
                     `)
                     .eq("order_id", order.id);
@@ -899,7 +899,7 @@ const OrderManagementPage = () => {
                   // Enrich items with tax/HSN data
                   const enrichedItems = (orderItems || []).map((item: any) => ({
                     ...item,
-                    hsn_code: item.product?.category?.hsn_code || null,
+                    hsn_code: item.hsn_code || item.product?.hsn_code || null,
                     tax_type: item.product?.tax_type || null,
                     tax_rate: item.product?.tax_rate || null,
                   }));
@@ -1218,7 +1218,7 @@ const OrderManagementPage = () => {
                                   product:products(
                                     tax_type,
                                     tax_rate,
-                                    category:categories(hsn_code)
+                                    hsn_code
                                   )
                                 `)
                                 .eq("order_id", order.id);
@@ -1231,7 +1231,7 @@ const OrderManagementPage = () => {
                               // Enrich items with tax/HSN data
                               const enrichedItems = (orderItems || []).map((item: any) => ({
                                 ...item,
-                                hsn_code: item.product?.category?.hsn_code || null,
+                                hsn_code: item.hsn_code || item.product?.hsn_code || null,
                                 tax_type: item.product?.tax_type || null,
                                 tax_rate: item.product?.tax_rate || null,
                               }));

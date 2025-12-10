@@ -51,6 +51,12 @@ const Sidebar = () => {
       path: "CategoryManagement",
     },
     {
+      name: "Fabric Management",
+      icon: Palette,
+      link: "/admin/FabricManagement",
+      path: "FabricManagement",
+    },
+    {
       name: "User Management",
       icon: Users,
       link: "/admin/UserManagement",

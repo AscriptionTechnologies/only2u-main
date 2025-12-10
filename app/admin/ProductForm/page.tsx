@@ -21,8 +21,10 @@ type Product = {
   vendor_name?: string;
   alias_vendor?: string;
   influencer_id?: string | null;
+  fabric_id?: string | null;
   tax_type?: "IGST" | "SGST" | null;
   tax_rate?: number;
+  hsn_code?: string | null;
   variants?: ProductVariant[];
 };
 
@@ -112,6 +114,7 @@ function ProductFormContent() {
   const [showVendorModal, setShowVendorModal] = useState(false);
   const [vendorSearch, setVendorSearch] = useState("");
   const [influencers, setInfluencers] = useState<{ id: string; name: string; username: string; is_verified: boolean }[]>([]);
+  const [fabrics, setFabrics] = useState<{ id: string; name: string; code?: string; is_active: boolean }[]>([]);
   const [uploadingImages, setUploadingImages] = useState(false);
   const [uploadingVideos, setUploadingVideos] = useState(false);
   const [failedImages, setFailedImages] = useState<Set<number>>(new Set());
@@ -142,10 +145,12 @@ function ProductFormContent() {
     vendor_name: "",
     alias_vendor: "",
     influencer_id: "",
+    fabric_id: "",
     is_active: true,
     featured_type: null as "trending" | "best_seller" | null,
     tax_type: null as "IGST" | "SGST" | null,
     tax_rate: "",
+    hsn_code: "",
   });
 
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
@@ -189,6 +194,7 @@ function ProductFormContent() {
         fetchSizes(),
         fetchVendors(),
         fetchInfluencers(),
+        fetchFabrics(),
         productId ? fetchProduct() : Promise.resolve(),
       ]);
 
@@ -267,6 +273,24 @@ function ProductFormContent() {
     }
   };
 
+  const fetchFabrics = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("fabrics")
+        .select("id, name, code, is_active")
+        .eq("is_active", true)
+        .order("name");
+
+      if (error) {
+        console.error("Error fetching fabrics:", error);
+        return;
+      }
+      setFabrics(data || []);
+    } catch (error) {
+      console.error("Error fetching fabrics:", error);
+    }
+  };
+
   const fetchInfluencers = async () => {
     try {
       const { data, error } = await supabase
@@ -309,10 +333,12 @@ function ProductFormContent() {
           replacement_policy_days,
           vendor_id,
           influencer_id,
+          fabric_id,
           vendor_name,
           alias_vendor,
           tax_type,
           tax_rate,
+          hsn_code,
           variants:product_variants(
             id,
             product_id,
@@ -363,6 +389,7 @@ function ProductFormContent() {
         replacement_policy_days: product.replacement_policy_days ? String(product.replacement_policy_days) : "",
         vendor_id: product.vendor_id || "",
         influencer_id: product.influencer_id || "",
+        fabric_id: product.fabric_id || "",
         vendor_name: product.vendor_name || "",
         alias_vendor: product.alias_vendor || "",
         is_active: product.is_active,
@@ -370,6 +397,7 @@ function ProductFormContent() {
           (product.featured_type as "trending" | "best_seller" | null) || null,
         tax_type: (product.tax_type as "IGST" | "SGST" | null) || null,
         tax_rate: product.tax_rate ? String(product.tax_rate) : "",
+        hsn_code: product.hsn_code || "",
       };
       console.log("Setting form data:", newFormData);
       setFormData(newFormData);
@@ -648,8 +676,8 @@ function ProductFormContent() {
   };
 
   const handleSubmit = async () => {
-    if (!formData.name.trim() || !formData.category_id) {
-      alert("Please fill all required fields");
+    if (!formData.name.trim() || !formData.category_id || !formData.hsn_code.trim()) {
+      alert("Please fill all required fields (Product Name, Category, and HSN Code)");
       return;
     }
 
@@ -675,12 +703,14 @@ function ProductFormContent() {
         replacement_policy_days: formData.replacement_policy_days ? parseInt(formData.replacement_policy_days) : null,
         vendor_id: formData.vendor_id || null,
         influencer_id: formData.influencer_id || null,
+        fabric_id: formData.fabric_id || null,
         vendor_name: formData.vendor_name,
         alias_vendor: formData.alias_vendor,
         is_active: formData.is_active,
         featured_type: formData.featured_type,
         tax_type: formData.tax_type,
         tax_rate: formData.tax_rate ? parseFloat(formData.tax_rate) : null,
+        hsn_code: formData.hsn_code.trim(),
         like_count: 0, // Default value for new products
         updated_at: new Date().toISOString(),
       };
@@ -1969,6 +1999,30 @@ function ProductFormContent() {
                       />
                     </div>
 
+                    {/* HSN Code */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        HSN Code <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.hsn_code}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            hsn_code: e.target.value,
+                          })
+                        }
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
+                        placeholder="e.g., 6109, 6203, 5007"
+                        maxLength={20}
+                        required
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        HSN (Harmonized System of Nomenclature) code for GST compliance (Required)
+                      </p>
+                    </div>
+
                     {/* Featured Type */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -2527,6 +2581,33 @@ function ProductFormContent() {
                           placeholder="Enter alias vendor name (optional)"
                         />
                       </div>
+                    </div>
+
+                    {/* Fabric Selection */}
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Fabric <span className="text-gray-500">(Optional)</span>
+                      </label>
+                      <select
+                        value={formData.fabric_id}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            fabric_id: e.target.value,
+                          })
+                        }
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
+                      >
+                        <option value="">None - No fabric selected</option>
+                        {fabrics.map((fabric) => (
+                          <option key={fabric.id} value={fabric.id}>
+                            {fabric.name} {fabric.code ? `(${fabric.code})` : ""}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Select the fabric type used in this product
+                      </p>
                     </div>
 
                     {/* Influencer Selection */}

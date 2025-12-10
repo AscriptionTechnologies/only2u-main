@@ -55,6 +55,8 @@ type FormState = {
   expires_at: string;
   is_active: boolean;
   bulk_count: string;
+  custom_code: string;
+  code_mode: "generate" | "custom";
 };
 
 const initialFormState: FormState = {
@@ -63,6 +65,8 @@ const initialFormState: FormState = {
   expires_at: "",
   is_active: true,
   bulk_count: "1",
+  custom_code: "",
+  code_mode: "generate",
 };
 
 const generateCode = (length: number = 8) => {
@@ -181,14 +185,6 @@ export default function ReferralManagementPage() {
     setSubmitting(true);
     setError(null);
 
-    const bulkCount = parseInt(formState.bulk_count) || 1;
-
-    if (bulkCount < 1 || bulkCount > 1000) {
-      setError("Bulk count must be between 1 and 1000.");
-      setSubmitting(false);
-      return;
-    }
-
     try {
       if (editingCode) {
         // Update existing code
@@ -212,39 +208,101 @@ export default function ReferralManagementPage() {
           fetchReferralCodes();
         }
       } else {
-        // Generate new codes in bulk
-        const newCodes = [];
+        // Create new code(s)
         const existingCodes = new Set(referralCodes.map((rc) => rc.code));
 
-        for (let i = 0; i < bulkCount; i++) {
-          let code = generateCode();
-          // Ensure uniqueness
-          while (existingCodes.has(code)) {
-            code = generateCode();
+        if (formState.code_mode === "custom") {
+          // Create custom code
+          const customCode = formState.custom_code.trim().toUpperCase();
+          
+          if (!customCode) {
+            setError("Please enter a custom code value.");
+            setSubmitting(false);
+            return;
           }
-          existingCodes.add(code);
 
-          newCodes.push({
-            code,
+          // Validate code format (alphanumeric, no spaces)
+          if (!/^[A-Z0-9]+$/.test(customCode)) {
+            setError("Code must contain only uppercase letters and numbers (no spaces or special characters).");
+            setSubmitting(false);
+            return;
+          }
+
+          // Check if code already exists
+          if (existingCodes.has(customCode)) {
+            setError(`Code "${customCode}" already exists. Please choose a different code.`);
+            setSubmitting(false);
+            return;
+          }
+
+          const newCode = {
+            code: customCode,
             description: formState.description.trim() || null,
             max_uses: sanitizeNumberField(formState.max_uses),
             expires_at: formState.expires_at ? new Date(formState.expires_at).toISOString() : null,
             is_active: formState.is_active,
             usage_count: 0,
             created_at: new Date().toISOString(),
-          });
-        }
+          };
 
-        const { error: insertError } = await supabase.from("referral_codes").insert(newCodes);
+          const { error: insertError } = await supabase.from("referral_codes").insert([newCode]);
 
-        if (insertError) {
-          console.error("Error creating referral codes:", insertError);
-          setError(insertError.message || "Failed to create referral codes.");
+          if (insertError) {
+            console.error("Error creating referral code:", insertError);
+            if (insertError.code === "23505") {
+              setError(`Code "${customCode}" already exists. Please choose a different code.`);
+            } else {
+              setError(insertError.message || "Failed to create referral code.");
+            }
+          } else {
+            resetForm();
+            fetchReferralCodes();
+            if (typeof window !== "undefined") {
+              window.alert(`Successfully created referral code "${customCode}"!`);
+            }
+          }
         } else {
-          resetForm();
-          fetchReferralCodes();
-          if (typeof window !== "undefined") {
-            window.alert(`Successfully generated ${bulkCount} referral code${bulkCount > 1 ? "s" : ""}!`);
+          // Generate random codes in bulk
+          const bulkCount = parseInt(formState.bulk_count) || 1;
+
+          if (bulkCount < 1 || bulkCount > 1000) {
+            setError("Bulk count must be between 1 and 1000.");
+            setSubmitting(false);
+            return;
+          }
+
+          const newCodes = [];
+
+          for (let i = 0; i < bulkCount; i++) {
+            let code = generateCode();
+            // Ensure uniqueness
+            while (existingCodes.has(code)) {
+              code = generateCode();
+            }
+            existingCodes.add(code);
+
+            newCodes.push({
+              code,
+              description: formState.description.trim() || null,
+              max_uses: sanitizeNumberField(formState.max_uses),
+              expires_at: formState.expires_at ? new Date(formState.expires_at).toISOString() : null,
+              is_active: formState.is_active,
+              usage_count: 0,
+              created_at: new Date().toISOString(),
+            });
+          }
+
+          const { error: insertError } = await supabase.from("referral_codes").insert(newCodes);
+
+          if (insertError) {
+            console.error("Error creating referral codes:", insertError);
+            setError(insertError.message || "Failed to create referral codes.");
+          } else {
+            resetForm();
+            fetchReferralCodes();
+            if (typeof window !== "undefined") {
+              window.alert(`Successfully generated ${bulkCount} referral code${bulkCount > 1 ? "s" : ""}!`);
+            }
           }
         }
       }
@@ -651,8 +709,40 @@ export default function ReferralManagementPage() {
           )}
         </div>
         <form onSubmit={handleSubmit} className="space-y-3">
+          {!editingCode && (
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-3">
+                Code Creation Mode
+              </label>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="code_mode"
+                    value="generate"
+                    checked={formState.code_mode === "generate"}
+                    onChange={(e) => handleFormChange("code_mode", e.target.value)}
+                    className="h-4 w-4 text-[#F53F7A] border-gray-300 focus:ring-[#F53F7A]"
+                  />
+                  <span className="text-sm text-gray-700">Generate Random Codes</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="code_mode"
+                    value="custom"
+                    checked={formState.code_mode === "custom"}
+                    onChange={(e) => handleFormChange("code_mode", e.target.value)}
+                    className="h-4 w-4 text-[#F53F7A] border-gray-300 focus:ring-[#F53F7A]"
+                  />
+                  <span className="text-sm text-gray-700">Create Custom Code</span>
+                </label>
+              </div>
+            </div>
+          )}
+
           <div className="grid gap-3 xl:grid-cols-5 md:grid-cols-3 sm:grid-cols-2">
-            {!editingCode && (
+            {!editingCode && formState.code_mode === "generate" && (
               <div>
                 <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">
                   Bulk Count
@@ -667,6 +757,28 @@ export default function ReferralManagementPage() {
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A]"
                 />
                 <p className="text-xs text-gray-500 mt-1">Generate 1-1000 codes at once</p>
+              </div>
+            )}
+            {!editingCode && formState.code_mode === "custom" && (
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">
+                  Custom Code Value <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formState.custom_code}
+                  onChange={(e) => {
+                    // Convert to uppercase and remove spaces
+                    const value = e.target.value.toUpperCase().replace(/\s+/g, "");
+                    handleFormChange("custom_code", value);
+                  }}
+                  placeholder="e.g., SUMMER2025"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#F53F7A]"
+                  required={formState.code_mode === "custom"}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Enter your custom code (letters and numbers only, no spaces)
+                </p>
               </div>
             )}
             <div>
@@ -746,6 +858,8 @@ export default function ReferralManagementPage() {
                 ? "Processing..."
                 : editingCode
                 ? "Update Code"
+                : formState.code_mode === "custom"
+                ? "Create Custom Code"
                 : `Generate ${formState.bulk_count} Code${parseInt(formState.bulk_count) > 1 ? "s" : ""}`}
             </button>
           </div>
