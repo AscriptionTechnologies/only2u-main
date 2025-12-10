@@ -63,10 +63,88 @@ const getProductCategoryName = (product: Product): string => {
   return product.category?.name || "N/A";
 };
 
+// Function to get size order for sorting (standard clothing size order)
+const getSizeOrder = (sizeName: string): number => {
+  const normalizedSize = sizeName.toUpperCase().trim();
+  
+  // Handle common size variations
+  const sizeOrder: { [key: string]: number } = {
+    'XXS': 1,
+    '2XS': 1,
+    'XS': 2,
+    'S': 3,
+    'M': 4,
+    'L': 5,
+    'XL': 6,
+    '1XL': 6,
+    'XXL': 7,
+    '2XL': 7,
+    'XXXL': 8,
+    '3XL': 8,
+    '4XL': 9,
+    '5XL': 10,
+    '6XL': 11,
+    '7XL': 12,
+    '8XL': 13,
+  };
+  
+  // Check exact match first
+  if (sizeOrder[normalizedSize] !== undefined) {
+    return sizeOrder[normalizedSize];
+  }
+  
+  // Handle patterns like "2XL", "3XL", etc. (numeric prefix)
+  const numericXlMatch = normalizedSize.match(/^(\d+)XL$/);
+  if (numericXlMatch) {
+    const num = parseInt(numericXlMatch[1]);
+    if (num === 1) return 6; // 1XL = XL
+    if (num === 2) return 7; // 2XL = XXL
+    if (num === 3) return 8; // 3XL = XXXL
+    if (num >= 4) return 8 + (num - 3); // 4XL, 5XL, etc.
+  }
+  
+  // Handle patterns like "XXL", "XXXL", etc. (multiple X's)
+  if (normalizedSize.match(/^X+L$/)) {
+    const xCount = normalizedSize.match(/X/g)?.length || 0;
+    if (xCount === 1) return 6; // XL
+    if (xCount === 2) return 7; // XXL
+    if (xCount === 3) return 8; // XXXL
+    if (xCount >= 4) return 8 + (xCount - 3); // XXXXL, etc.
+  }
+  
+  // Check if it starts with a known size (but be careful with partial matches)
+  // Only check if it's a complete word match or starts with the key followed by non-letter
+  for (const [key, value] of Object.entries(sizeOrder)) {
+    // Exact match already handled above, so check if it starts with the key
+    // but make sure we don't match "XL" when we have "XXL"
+    if (normalizedSize === key || normalizedSize.startsWith(key + ' ') || normalizedSize.startsWith(key + '-')) {
+      return value;
+    }
+  }
+  
+  // For numeric sizes (like "28", "30", etc.), try to parse and assign high order
+  const numericMatch = normalizedSize.match(/^(\d+)$/);
+  if (numericMatch) {
+    const num = parseInt(numericMatch[1]);
+    // Assume numeric sizes come after standard sizes
+    return 100 + num;
+  }
+  
+  // Unknown sizes go to the end
+  return 1000;
+};
+
+type CategoryStats = {
+  categoryId: string;
+  totalProducts: number;
+  sizeCounts: { sizeName: string; count: number }[];
+};
+
 export default function CategoryManagement() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [featureSections, setFeatureSections] = useState<FeatureSection[]>([]);
+  const [categoryStats, setCategoryStats] = useState<CategoryStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [loadingSections, setLoadingSections] = useState(false);
@@ -93,6 +171,12 @@ export default function CategoryManagement() {
   }, []);
 
   useEffect(() => {
+    if (categories.length > 0) {
+      fetchCategoryStats();
+    }
+  }, [categories]);
+
+  useEffect(() => {
     if (viewMode === 'featured') {
       fetchFeaturedProducts();
     }
@@ -115,6 +199,88 @@ export default function CategoryManagement() {
       console.error('Error fetching categories:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCategoryStats = async () => {
+    try {
+      const stats: CategoryStats[] = [];
+      
+      for (const category of categories) {
+        // Get total product count for this category
+        const { count: productCount } = await supabase
+          .from('products')
+          .select('*', { count: 'exact', head: true })
+          .eq('category_id', category.id);
+        
+        // Get all products in this category
+        const { data: productsData } = await supabase
+          .from('products')
+          .select('id')
+          .eq('category_id', category.id);
+        
+        if (!productsData || productsData.length === 0) {
+          stats.push({
+            categoryId: category.id,
+            totalProducts: productCount || 0,
+            sizeCounts: [],
+          });
+          continue;
+        }
+        
+        const productIds = productsData.map(p => p.id);
+        
+        // Get all variants for products in this category with size information
+        const { data: variantsData, error: variantsError } = await supabase
+          .from('product_variants')
+          .select(`
+            id,
+            size_id,
+            size:sizes(name)
+          `)
+          .in('product_id', productIds);
+        
+        if (variantsError) {
+          console.error(`Error fetching variants for category ${category.id}:`, variantsError);
+          stats.push({
+            categoryId: category.id,
+            totalProducts: productCount || 0,
+            sizeCounts: [],
+          });
+          continue;
+        }
+        
+        // Count variants by size
+        const sizeCountMap: { [key: string]: number } = {};
+        if (variantsData) {
+          variantsData.forEach((variant: any) => {
+            const sizeName = variant.size?.name || 'Unknown';
+            sizeCountMap[sizeName] = (sizeCountMap[sizeName] || 0) + 1;
+          });
+        }
+        
+        const sizeCounts = Object.entries(sizeCountMap)
+          .map(([sizeName, count]) => ({ sizeName, count }))
+          .sort((a, b) => {
+            const orderA = getSizeOrder(a.sizeName);
+            const orderB = getSizeOrder(b.sizeName);
+            // If same order, sort alphabetically
+            if (orderA === orderB) {
+              return a.sizeName.localeCompare(b.sizeName);
+            }
+            return orderA - orderB;
+          });
+        
+        stats.push({
+          categoryId: category.id,
+          totalProducts: productCount || 0,
+          sizeCounts,
+        });
+      }
+      
+      setCategoryStats(stats);
+    } catch (error) {
+      console.error('Error fetching category stats:', error);
     }
   };
 
@@ -157,7 +323,8 @@ export default function CategoryManagement() {
         console.error('Error deleting category:', error);
         return;
       }
-      fetchCategories();
+      await fetchCategories();
+      // Stats will be refreshed automatically via useEffect when categories change
     } catch (error) {
       console.error('Error deleting category:', error);
     }
@@ -241,7 +408,8 @@ export default function CategoryManagement() {
         }
       }
       setModalVisible(false);
-      fetchCategories();
+      await fetchCategories();
+      // Stats will be refreshed automatically via useEffect when categories change
     } catch (error) {
       console.error('Error submitting category:', error);
     } finally {
@@ -262,7 +430,8 @@ export default function CategoryManagement() {
         console.error('Error updating category status:', error);
         return;
       }
-      fetchCategories();
+      await fetchCategories();
+      // Stats will be refreshed automatically via useEffect when categories change
     } catch (error) {
       console.error('Error updating category status:', error);
     }
@@ -544,12 +713,14 @@ export default function CategoryManagement() {
         if (!response.ok) {
           console.error('Failed to update category order');
           // Revert the order if the API call fails
-          fetchCategories();
+          await fetchCategories();
+      // Stats will be refreshed automatically via useEffect when categories change
         }
       } catch (error) {
         console.error('Error updating category order:', error);
         // Revert the order if the API call fails
-        fetchCategories();
+        await fetchCategories();
+      // Stats will be refreshed automatically via useEffect when categories change
       }
     }
   };
@@ -818,16 +989,20 @@ export default function CategoryManagement() {
               items={categories.map(cat => cat.id)}
               strategy={verticalListSortingStrategy}
             >
-              {categories.map((cat) => (
-                <SortableCategoryCard
-                  key={cat.id}
-                  category={cat}
-                  onCategoryClick={handleCategoryClick}
-                  onToggleStatus={toggleCategoryStatus}
-                  onEdit={handleEditCategory}
-                  onDelete={handleDeleteCategory}
-                />
-              ))}
+              {categories.map((cat) => {
+                const stats = categoryStats.find(s => s.categoryId === cat.id);
+                return (
+                  <SortableCategoryCard
+                    key={cat.id}
+                    category={cat}
+                    stats={stats}
+                    onCategoryClick={handleCategoryClick}
+                    onToggleStatus={toggleCategoryStatus}
+                    onEdit={handleEditCategory}
+                    onDelete={handleDeleteCategory}
+                  />
+                );
+              })}
             </SortableContext>
           </DndContext>
         )}
@@ -1254,6 +1429,7 @@ function SortableFeatureSectionCard({
 // Sortable Category Card Component
 type SortableCategoryCardProps = {
   category: Category;
+  stats?: CategoryStats;
   onCategoryClick: (category: Category) => void;
   onToggleStatus: (category: Category) => void;
   onEdit: (category: Category) => void;
@@ -1262,6 +1438,7 @@ type SortableCategoryCardProps = {
 
 function SortableCategoryCard({
   category,
+  stats,
   onCategoryClick,
   onToggleStatus,
   onEdit,
@@ -1313,13 +1490,48 @@ function SortableCategoryCard({
           />
         )}
         <div className="flex-1">
-          <h3 className="text-lg font-semibold text-gray-800">
-            {category.name}
-          </h3>
-          <p className="text-sm text-gray-600">{category.description}</p>
-          <span className={`inline-block mt-2 px-3 py-1 text-xs rounded-full font-semibold ${category.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-            {category.is_active ? 'Active' : 'Inactive'}
-          </span>
+          <div className="flex items-start justify-between gap-4 mb-2">
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-gray-800">
+                {category.name}
+              </h3>
+              <p className="text-sm text-gray-600 mt-1">{category.description}</p>
+            </div>
+            <span className={`inline-block px-3 py-1 text-xs rounded-full font-semibold whitespace-nowrap ${category.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+              {category.is_active ? 'Active' : 'Inactive'}
+            </span>
+          </div>
+          {stats && (
+            <div className="mt-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+                <span className="text-sm font-medium text-gray-700">
+                  Total Products: <span className="text-blue-600 font-semibold">{stats.totalProducts}</span>
+                </span>
+              </div>
+              {stats.sizeCounts.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-medium text-gray-600">Size/Variant Count:</span>
+                  {stats.sizeCounts.map((sizeCount, idx) => (
+                    <span
+                      key={idx}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-md font-medium bg-gray-100 text-gray-700 border border-gray-200"
+                      title={`${sizeCount.count} variant${sizeCount.count !== 1 ? 's' : ''} in size ${sizeCount.sizeName}`}
+                    >
+                      <span className="font-semibold">{sizeCount.sizeName}</span>
+                      <span className="text-gray-500">×</span>
+                      <span className="text-blue-600 font-bold">{sizeCount.count}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+              {stats.sizeCounts.length === 0 && stats.totalProducts > 0 && (
+                <span className="text-xs text-gray-500 italic">No variants found</span>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
