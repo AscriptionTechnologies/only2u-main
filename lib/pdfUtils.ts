@@ -15,6 +15,7 @@ type OrderItem = {
   total_price: number;
   discount?: number;
   hsn_code?: string;
+  unit_of_measurement?: string;
   tax_type?: string;
   tax_rate?: number;
   // Tax calculation properties (added during processing)
@@ -661,10 +662,11 @@ export async function generateOrderPdf(order: Order) {
     doc.line(marginLeft + 158, headerY, marginLeft + 158, headerY + headerHeight);
     doc.line(marginLeft + 206, headerY, marginLeft + 206, headerY + headerHeight);
     doc.line(marginLeft + 244, headerY, marginLeft + 244, headerY + headerHeight);
-    doc.line(marginLeft + 272, headerY, marginLeft + 272, headerY + headerHeight);
-    doc.line(marginLeft + 318, headerY, marginLeft + 318, headerY + headerHeight);
-    doc.line(marginLeft + 392, headerY, marginLeft + 392, headerY + headerHeight);
-    doc.line(marginLeft + 452, headerY, marginLeft + 452, headerY + headerHeight);
+    doc.line(marginLeft + 260, headerY, marginLeft + 260, headerY + headerHeight);
+    doc.line(marginLeft + 285, headerY, marginLeft + 285, headerY + headerHeight);
+    doc.line(marginLeft + 328, headerY, marginLeft + 328, headerY + headerHeight);
+    doc.line(marginLeft + 400, headerY, marginLeft + 400, headerY + headerHeight);
+    doc.line(marginLeft + 460, headerY, marginLeft + 460, headerY + headerHeight);
     
     // Center text vertically in header
     const headerTextY = headerY + (headerHeight / 2) + 3; // Center vertically with slight adjustment
@@ -680,10 +682,11 @@ export async function generateOrderPdf(order: Order) {
     doc.text('Unit Price', marginLeft + 161, headerTextY);
     doc.text('Discount', marginLeft + 209, headerTextY);
     doc.text('Qty', marginLeft + 247, headerTextY);
-    doc.text('Net Amount', marginLeft + 275, headerTextY);
-    doc.text('Tax Rate', marginLeft + 321, headerTextY);
-    doc.text('Total Tax', marginLeft + 395, headerTextY);
-    doc.text('Total Amount', marginLeft + 455, headerTextY);
+    doc.text('Unit', marginLeft + 262, headerTextY);
+    doc.text('Net Amount', marginLeft + 287, headerTextY);
+    doc.text('Tax Rate', marginLeft + 330, headerTextY);
+    doc.text('Total Tax', marginLeft + 402, headerTextY);
+    doc.text('Total Amount', marginLeft + 462, headerTextY);
     
     cursorY = headerY + headerHeight + 2; // Small gap after header
     
@@ -705,6 +708,7 @@ export async function generateOrderPdf(order: Order) {
       const size = item.size || '';
       const color = item.color || '';
       const hsnCode = item.hsn_code || '';
+      const unitOfMeasurement = item.unit_of_measurement || 'PCS';
       const discount = Number(item.discount) || 0; // Get discount if available
       
       // Use pre-calculated tax values from the tax calculation above
@@ -763,13 +767,15 @@ export async function generateOrderPdf(order: Order) {
       // Discount separator
       doc.line(marginLeft + 244, rowStartY, marginLeft + 244, rowStartY + itemHeight);
       // Qty separator
-      doc.line(marginLeft + 272, rowStartY, marginLeft + 272, rowStartY + itemHeight);
+      doc.line(marginLeft + 260, rowStartY, marginLeft + 260, rowStartY + itemHeight);
+      // Unit separator
+      doc.line(marginLeft + 285, rowStartY, marginLeft + 285, rowStartY + itemHeight);
       // Net Amount separator
-      doc.line(marginLeft + 318, rowStartY, marginLeft + 318, rowStartY + itemHeight);
+      doc.line(marginLeft + 328, rowStartY, marginLeft + 328, rowStartY + itemHeight);
       // Tax Rate separator
-      doc.line(marginLeft + 392, rowStartY, marginLeft + 392, rowStartY + itemHeight);
+      doc.line(marginLeft + 400, rowStartY, marginLeft + 400, rowStartY + itemHeight);
       // Total Tax separator
-      doc.line(marginLeft + 452, rowStartY, marginLeft + 452, rowStartY + itemHeight);
+      doc.line(marginLeft + 460, rowStartY, marginLeft + 460, rowStartY + itemHeight);
       
       // Calculate center Y for this row
       const rowCenterY = rowStartY + (itemHeight / 2);
@@ -809,14 +815,17 @@ export async function generateOrderPdf(order: Order) {
       // Quantity (centered vertically)
       doc.text(String(quantity), marginLeft + 247, rowTopY + 7);
       
+      // Unit of Measurement (centered vertically)
+      doc.text(unitOfMeasurement, marginLeft + 262, rowTopY + 7);
+      
       // Net Amount (centered vertically)
-      doc.text(formatINR(netAmount), marginLeft + 275, rowTopY + 7);
+      doc.text(formatINR(netAmount), marginLeft + 287, rowTopY + 7);
       
       // Tax Rate (centered vertically) - Show breakdown with amounts for CGST+SGST
       // Constrain text width to prevent overflow into Total Tax column
       doc.setFontSize(7);
       let taxRateY = rowTopY + 7;
-      const taxRateMaxWidth = 65; // Maximum width for tax rate column (392 - 321 - 6pt padding)
+      const taxRateMaxWidth = 65; // Maximum width for tax rate column
       
       if (isInterState) {
         // Interstate: Show IGST
@@ -824,11 +833,11 @@ export async function generateOrderPdf(order: Order) {
           const igstText = `IGST ${formatNumber(igstRate)}% ${formatINR(igstAmount)}`;
           const igstLines = doc.splitTextToSize(igstText, taxRateMaxWidth);
           igstLines.forEach((line: string, idx: number) => {
-            doc.text(line, marginLeft + 321, taxRateY);
+            doc.text(line, marginLeft + 330, taxRateY);
             if (idx < igstLines.length - 1) taxRateY += 9;
           });
         } else {
-          doc.text('0%', marginLeft + 321, taxRateY);
+          doc.text('0%', marginLeft + 330, taxRateY);
         }
       } else {
         // Intrastate: Always show CGST and SGST (even if 0 for some items in mixed orders)
@@ -837,7 +846,7 @@ export async function generateOrderPdf(order: Order) {
           const cgstText = `CGST ${formatNumber(cgstRate)}% ${formatINR(cgstAmount)}`;
           const cgstLines = doc.splitTextToSize(cgstText, taxRateMaxWidth);
           cgstLines.forEach((line: string, idx: number) => {
-            doc.text(line, marginLeft + 321, taxRateY);
+            doc.text(line, marginLeft + 330, taxRateY);
             if (idx < cgstLines.length - 1) taxRateY += 9;
           });
           taxRateY += 9;
@@ -846,25 +855,25 @@ export async function generateOrderPdf(order: Order) {
           const sgstText = `SGST ${formatNumber(sgstRate)}% ${formatINR(sgstAmount)}`;
           const sgstLines = doc.splitTextToSize(sgstText, taxRateMaxWidth);
           sgstLines.forEach((line: string, idx: number) => {
-            doc.text(line, marginLeft + 321, taxRateY);
+            doc.text(line, marginLeft + 330, taxRateY);
             if (idx < sgstLines.length - 1) taxRateY += 9;
           });
         }
         // If both CGST and SGST are 0 or missing, show 0%
         if ((!cgstRate || cgstRate === 0) && (!sgstRate || sgstRate === 0) && 
             (!cgstAmount || cgstAmount === 0) && (!sgstAmount || sgstAmount === 0)) {
-          doc.text('0%', marginLeft + 321, taxRateY);
+          doc.text('0%', marginLeft + 330, taxRateY);
         }
       }
       doc.setFontSize(9);
       
       // Total Tax (centered vertically)
-      doc.text(formatINR(taxAmount), marginLeft + 395, rowTopY + 7);
+      doc.text(formatINR(taxAmount), marginLeft + 402, rowTopY + 7);
       
       // Total Amount (centered vertically, bold)
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(9);
-      doc.text(formatINR(totalAmount), marginLeft + 455, rowTopY + 7);
+      doc.text(formatINR(totalAmount), marginLeft + 462, rowTopY + 7);
       doc.setFont('helvetica', 'normal');
       
       // Move to next item with proper spacing
@@ -1185,7 +1194,9 @@ type ReturnItem = {
   quantity: number;
   unit_price: number;
   total_price: number;
+  discount?: number;
   hsn_code?: string;
+  unit_of_measurement?: string;
   cgst_rate?: number;
   sgst_rate?: number;
   igst_rate?: number;
@@ -1418,9 +1429,9 @@ export async function generateReturnInvoicePdf(returnOrder: OrderReturn) {
   infoY += 15;
   
   if (originalOrder) {
-    // Original Invoice - Label and value on separate lines
+    // Order Invoice Number - Label and value on separate lines
     doc.setFontSize(9);
-    doc.text(`Original Invoice:`, pageWidth - marginRight - 5, infoY, { align: 'right' });
+    doc.text(`Order Invoice Number:`, pageWidth - marginRight - 5, infoY, { align: 'right' });
     infoY += 12;
     doc.setFontSize(8);
     const origInvLines = doc.splitTextToSize(originalInvoiceNumber, 180);
@@ -1429,11 +1440,11 @@ export async function generateReturnInvoicePdf(returnOrder: OrderReturn) {
     });
     infoY += origInvLines.length * 10;
     
-    // Original Date
+    // Order Invoice Date
     doc.setFontSize(9);
     const originalDate = new Date(originalOrder.created_at);
     const originalFormattedDate = originalDate.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    doc.text(`Original Date: ${originalFormattedDate}`, pageWidth - marginRight - 5, infoY, { align: 'right' });
+    doc.text(`Order Invoice Date: ${originalFormattedDate}`, pageWidth - marginRight - 5, infoY, { align: 'right' });
   }
 
   cursorY = marginTop + headerBoxHeight + 20;
@@ -1559,10 +1570,11 @@ export async function generateReturnInvoicePdf(returnOrder: OrderReturn) {
     doc.line(marginLeft + 158, headerY, marginLeft + 158, headerY + headerHeight);
     doc.line(marginLeft + 206, headerY, marginLeft + 206, headerY + headerHeight);
     doc.line(marginLeft + 244, headerY, marginLeft + 244, headerY + headerHeight);
-    doc.line(marginLeft + 272, headerY, marginLeft + 272, headerY + headerHeight);
-    doc.line(marginLeft + 318, headerY, marginLeft + 318, headerY + headerHeight);
-    doc.line(marginLeft + 392, headerY, marginLeft + 392, headerY + headerHeight);
-    doc.line(marginLeft + 452, headerY, marginLeft + 452, headerY + headerHeight);
+    doc.line(marginLeft + 260, headerY, marginLeft + 260, headerY + headerHeight);
+    doc.line(marginLeft + 285, headerY, marginLeft + 285, headerY + headerHeight);
+    doc.line(marginLeft + 328, headerY, marginLeft + 328, headerY + headerHeight);
+    doc.line(marginLeft + 400, headerY, marginLeft + 400, headerY + headerHeight);
+    doc.line(marginLeft + 460, headerY, marginLeft + 460, headerY + headerHeight);
     
     // Center text vertically in header
     const headerTextY = headerY + (headerHeight / 2) + 3; // Center vertically with slight adjustment
@@ -1577,10 +1589,11 @@ export async function generateReturnInvoicePdf(returnOrder: OrderReturn) {
     doc.text('Unit Price', marginLeft + 161, headerTextY);
     doc.text('Discount', marginLeft + 209, headerTextY);
     doc.text('Qty', marginLeft + 247, headerTextY);
-    doc.text('Net Amount', marginLeft + 275, headerTextY);
-    doc.text('Tax Rate', marginLeft + 321, headerTextY);
-    doc.text('Total Tax', marginLeft + 395, headerTextY);
-    doc.text('Total Amount', marginLeft + 455, headerTextY);
+    doc.text('Unit', marginLeft + 262, headerTextY);
+    doc.text('Net Amount', marginLeft + 287, headerTextY);
+    doc.text('Tax Rate', marginLeft + 330, headerTextY);
+    doc.text('Total Tax', marginLeft + 402, headerTextY);
+    doc.text('Total Amount', marginLeft + 462, headerTextY);
     
     cursorY = headerY + headerHeight + 2; // Small gap after header
     
@@ -1602,6 +1615,7 @@ export async function generateReturnInvoicePdf(returnOrder: OrderReturn) {
       const size = item.size || '';
       const color = item.color || '';
       const hsnCode = item.hsn_code || '';
+      const unitOfMeasurement = item.unit_of_measurement || 'PCS';
       const discount = Number(item.discount) || 0;
       
       // Calculate taxes based on unit price (same logic as regular invoice)
@@ -1689,13 +1703,15 @@ export async function generateReturnInvoicePdf(returnOrder: OrderReturn) {
       // Discount separator
       doc.line(marginLeft + 244, rowStartY, marginLeft + 244, rowStartY + itemHeight);
       // Qty separator
-      doc.line(marginLeft + 272, rowStartY, marginLeft + 272, rowStartY + itemHeight);
+      doc.line(marginLeft + 260, rowStartY, marginLeft + 260, rowStartY + itemHeight);
+      // Unit separator
+      doc.line(marginLeft + 285, rowStartY, marginLeft + 285, rowStartY + itemHeight);
       // Net Amount separator
-      doc.line(marginLeft + 318, rowStartY, marginLeft + 318, rowStartY + itemHeight);
+      doc.line(marginLeft + 328, rowStartY, marginLeft + 328, rowStartY + itemHeight);
       // Tax Rate separator
-      doc.line(marginLeft + 392, rowStartY, marginLeft + 392, rowStartY + itemHeight);
+      doc.line(marginLeft + 400, rowStartY, marginLeft + 400, rowStartY + itemHeight);
       // Total Tax separator
-      doc.line(marginLeft + 452, rowStartY, marginLeft + 452, rowStartY + itemHeight);
+      doc.line(marginLeft + 460, rowStartY, marginLeft + 460, rowStartY + itemHeight);
       
       // Calculate center Y for this row
       const rowCenterY = rowStartY + (itemHeight / 2);
@@ -1735,14 +1751,17 @@ export async function generateReturnInvoicePdf(returnOrder: OrderReturn) {
       // Quantity (centered vertically)
       doc.text(String(quantity), marginLeft + 247, rowTopY + 7);
       
+      // Unit of Measurement (centered vertically)
+      doc.text(unitOfMeasurement, marginLeft + 262, rowTopY + 7);
+      
       // Net Amount (centered vertically)
-      doc.text(formatINR(netAmount), marginLeft + 275, rowTopY + 7);
+      doc.text(formatINR(netAmount), marginLeft + 287, rowTopY + 7);
       
       // Tax Rate (centered vertically) - Show breakdown with amounts for CGST+SGST
       // Constrain text width to prevent overflow into Total Tax column
       doc.setFontSize(7);
       let taxRateY = rowTopY + 7;
-      const taxRateMaxWidth = 65; // Maximum width for tax rate column (392 - 321 - 6pt padding)
+      const taxRateMaxWidth = 65; // Maximum width for tax rate column
       
       if (isInterState) {
         // Interstate: Show IGST
@@ -1750,11 +1769,11 @@ export async function generateReturnInvoicePdf(returnOrder: OrderReturn) {
           const igstText = `IGST ${formatNumber(igstRate)}% ${formatINR(igstAmount)}`;
           const igstLines = doc.splitTextToSize(igstText, taxRateMaxWidth);
           igstLines.forEach((line: string, idx: number) => {
-            doc.text(line, marginLeft + 321, taxRateY);
+            doc.text(line, marginLeft + 330, taxRateY);
             if (idx < igstLines.length - 1) taxRateY += 9;
           });
         } else {
-          doc.text('0%', marginLeft + 321, taxRateY);
+          doc.text('0%', marginLeft + 330, taxRateY);
         }
       } else {
         // Intrastate: Always show CGST and SGST (even if 0 for some items in mixed orders)
@@ -1763,7 +1782,7 @@ export async function generateReturnInvoicePdf(returnOrder: OrderReturn) {
           const cgstText = `CGST ${formatNumber(cgstRate)}% ${formatINR(cgstAmount)}`;
           const cgstLines = doc.splitTextToSize(cgstText, taxRateMaxWidth);
           cgstLines.forEach((line: string, idx: number) => {
-            doc.text(line, marginLeft + 321, taxRateY);
+            doc.text(line, marginLeft + 330, taxRateY);
             if (idx < cgstLines.length - 1) taxRateY += 9;
           });
           taxRateY += 9;
@@ -1772,26 +1791,26 @@ export async function generateReturnInvoicePdf(returnOrder: OrderReturn) {
           const sgstText = `SGST ${formatNumber(sgstRate)}% ${formatINR(sgstAmount)}`;
           const sgstLines = doc.splitTextToSize(sgstText, taxRateMaxWidth);
           sgstLines.forEach((line: string, idx: number) => {
-            doc.text(line, marginLeft + 321, taxRateY);
+            doc.text(line, marginLeft + 330, taxRateY);
             if (idx < sgstLines.length - 1) taxRateY += 9;
           });
         }
         // If both CGST and SGST are 0 or missing, show 0%
         if ((!cgstRate || cgstRate === 0) && (!sgstRate || sgstRate === 0) && 
             (!cgstAmount || cgstAmount === 0) && (!sgstAmount || sgstAmount === 0)) {
-          doc.text('0%', marginLeft + 321, taxRateY);
+          doc.text('0%', marginLeft + 330, taxRateY);
         }
       }
       doc.setFontSize(9);
       
       // Total Tax (centered vertically)
-      doc.text(formatINR(taxAmount), marginLeft + 395, rowTopY + 7);
+      doc.text(formatINR(taxAmount), marginLeft + 402, rowTopY + 7);
       
       // Total Amount (centered vertically, bold, red for refund)
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(9);
       doc.setTextColor(220, 20, 60); // Red color for refund amount
-      doc.text(formatINR(-totalAmount), marginLeft + 455, rowTopY + 7);
+      doc.text(formatINR(-totalAmount), marginLeft + 462, rowTopY + 7);
       doc.setTextColor(0, 0, 0);
       doc.setFont('helvetica', 'normal');
       
