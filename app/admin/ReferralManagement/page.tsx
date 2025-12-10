@@ -156,6 +156,8 @@ export default function ReferralManagementPage() {
       expires_at: code.expires_at ? code.expires_at.slice(0, 16) : "",
       is_active: code.is_active,
       bulk_count: "1",
+      custom_code: "",
+      code_mode: "generate",
     });
     setError(null);
   };
