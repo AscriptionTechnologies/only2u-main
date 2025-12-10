@@ -5,7 +5,7 @@ import { Eye, CheckCircle, XCircle, Trash2 } from "lucide-react";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { supabase } from "../../../lib/supabase";
-import { generateOrderPdf } from "../../../lib/pdfUtils";
+import { generateOrderPdf, generateReturnInvoicePdf } from "../../../lib/pdfUtils";
 import { exportToExcel } from "../../../lib/exportUtils";
 
 interface OrderItem {
@@ -77,15 +77,62 @@ interface DraftOrder {
   };
 }
 
+interface ReturnItem {
+  id: string;
+  return_id: string;
+  order_item_id: string;
+  product_id: string;
+  product_name: string;
+  product_sku: string;
+  size?: string;
+  color?: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  hsn_code?: string;
+  cgst_rate?: number;
+  sgst_rate?: number;
+  igst_rate?: number;
+  cgst_amount?: number;
+  sgst_amount?: number;
+  igst_amount?: number;
+  tax_amount?: number;
+  net_amount?: number;
+}
+
+interface OrderReturn {
+  id: string;
+  order_id: string;
+  return_number: string;
+  return_reason?: string;
+  return_status: string;
+  refund_amount: number;
+  refund_method?: string;
+  refund_status: string;
+  return_date: string;
+  processed_at?: string;
+  notes?: string;
+  created_at: string;
+  return_items?: ReturnItem[];
+  order?: Order;
+  user?: {
+    name?: string;
+    email?: string;
+    phone?: string;
+  };
+}
+
 const OrderManagementPage = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [draftOrders, setDraftOrders] = useState<DraftOrder[]>([]);
+  const [returnOrders, setReturnOrders] = useState<OrderReturn[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingReturns, setLoadingReturns] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [selectedDraftOrder, setSelectedDraftOrder] = useState<DraftOrder | null>(null);
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [viewDraftModalOpen, setViewDraftModalOpen] = useState(false);
-  const [orderView, setOrderView] = useState<'regular' | 'draft'>('draft'); // Default to draft orders
+  const [orderView, setOrderView] = useState<'regular' | 'draft' | 'returns'>('draft'); // Default to draft orders
   const [approvingOrder, setApprovingOrder] = useState<string | null>(null);
   const [rejectingOrder, setRejectingOrder] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -93,6 +140,7 @@ const OrderManagementPage = () => {
   useEffect(() => {
     fetchOrders();
     fetchDraftOrders();
+    fetchReturnOrders();
   }, []);
 
   const fetchOrders = async () => {
@@ -194,6 +242,106 @@ const OrderManagementPage = () => {
       setDraftOrders(draftOrdersWithItems);
     } catch (error) {
       console.error("Error:", error);
+    }
+  };
+
+  const fetchReturnOrders = async () => {
+    setLoadingReturns(true);
+    try {
+      // Fetch return orders with order and user information
+      const { data: returnsData, error: returnsError } = await supabase
+        .from("order_returns")
+        .select(`
+          *,
+          order:orders(
+            *,
+            user:users(name, email, phone)
+          )
+        `)
+        .order("created_at", { ascending: false });
+
+      if (returnsError) {
+        console.error("Error fetching return orders:", returnsError);
+        toast.error("Failed to fetch return orders");
+        return;
+      }
+
+      // Fetch return items
+      const { data: returnItemsData, error: returnItemsError } = await supabase
+        .from("order_return_items")
+        .select("*");
+
+      if (returnItemsError) {
+        console.error("Error fetching return items:", returnItemsError);
+        return;
+      }
+
+      // Combine return orders with their items and user info
+      const returnsWithItems = (returnsData || []).map((returnOrder: any) => ({
+        ...returnOrder,
+        return_items: (returnItemsData || []).filter(
+          (item: ReturnItem) => item.return_id === returnOrder.id
+        ),
+        user: returnOrder.order?.user || null,
+      }));
+
+      setReturnOrders(returnsWithItems);
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Failed to fetch return orders");
+    } finally {
+      setLoadingReturns(false);
+    }
+  };
+
+  const downloadReturnInvoice = async (returnOrder: OrderReturn) => {
+    try {
+      // Ensure we have all necessary data
+      if (!returnOrder.return_items || returnOrder.return_items.length === 0) {
+        toast.error("Return items not found. Please refresh and try again.");
+        return;
+      }
+
+      // Fetch original order if not already loaded
+      let orderData = returnOrder.order;
+      if (!orderData) {
+        const { data, error } = await supabase
+          .from("orders")
+          .select(`
+            *,
+            user:users(name, email, phone),
+            order_items:order_items(
+              *,
+              product:products(hsn_code)
+            )
+          `)
+          .eq("id", returnOrder.order_id)
+          .single();
+
+        if (error || !data) {
+          toast.error("Failed to fetch original order details");
+          return;
+        }
+        orderData = data;
+      }
+
+      // Prepare return order with all data
+      if (!orderData) {
+        toast.error("Failed to fetch original order details");
+        return;
+      }
+
+      const returnOrderWithData: OrderReturn = {
+        ...returnOrder,
+        order: orderData,
+        user: returnOrder.user || orderData.user,
+      };
+
+      await generateReturnInvoicePdf(returnOrderWithData);
+      toast.success("Return invoice downloaded successfully");
+    } catch (error) {
+      console.error("Error generating return invoice:", error);
+      toast.error("Failed to generate return invoice");
     }
   };
 
@@ -990,13 +1138,15 @@ const OrderManagementPage = () => {
                     d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M8 12l4 4m0 0l4-4m-4 4V4"
                   />
                 </svg>
-                Export {orderView === "regular" ? "Orders" : "Drafts"}
+                Export {orderView === "regular" ? "Orders" : orderView === "returns" ? "Returns" : "Drafts"}
               </>
             )}
           </button>
           <span className="text-sm text-gray-600">
             {orderView === "draft"
               ? `${draftOrders.filter((o) => o.status === "draft").length} pending draft orders`
+              : orderView === "returns"
+              ? `${returnOrders.length} return orders`
               : `${orders.length} total orders`}
           </span>
         </div>
@@ -1039,6 +1189,24 @@ const OrderManagementPage = () => {
               {orders.length > 0 && (
                 <span className="bg-green-100 text-green-800 text-xs font-semibold px-2 py-0.5 rounded-full">
                   {orders.length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setOrderView('returns')}
+              className={`${
+                orderView === 'returns'
+                  ? 'border-[#F53F7A] text-[#F53F7A]'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-2`}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Sales Returns
+              {returnOrders.length > 0 && (
+                <span className="bg-red-100 text-red-800 text-xs font-semibold px-2 py-0.5 rounded-full">
+                  {returnOrders.length}
                 </span>
               )}
             </button>
@@ -1292,6 +1460,106 @@ const OrderManagementPage = () => {
         </div>
       </div>
         )}
+
+      {/* Returns Table */}
+      {orderView === 'returns' && (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 bg-red-50">
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <h2 className="text-lg font-semibold text-gray-900">Sales Return Orders</h2>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Return Number</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Original Order</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Refund Amount</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Return Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Refund Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Return Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {loadingReturns ? (
+                  <tr>
+                    <td colSpan={8} className="px-6 py-10 text-center text-gray-400">
+                      Loading return orders...
+                    </td>
+                  </tr>
+                ) : returnOrders.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-6 py-10 text-center text-gray-400">
+                      No return orders found.
+                    </td>
+                  </tr>
+                ) : (
+                  returnOrders.map((returnOrder) => (
+                    <tr key={returnOrder.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{returnOrder.return_number}</div>
+                        {returnOrder.return_reason && (
+                          <div className="text-xs text-gray-500 mt-1">{returnOrder.return_reason.substring(0, 50)}...</div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {returnOrder.order?.order_number || 'N/A'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{returnOrder.user?.name || 'N/A'}</div>
+                        <div className="text-xs text-gray-500">{returnOrder.user?.email || ''}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-red-600">
+                        ₹{returnOrder.refund_amount.toFixed(2)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          returnOrder.return_status === 'completed' ? 'bg-green-100 text-green-800' :
+                          returnOrder.return_status === 'approved' ? 'bg-blue-100 text-blue-800' :
+                          returnOrder.return_status === 'rejected' ? 'bg-red-100 text-red-800' :
+                          'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {returnOrder.return_status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          returnOrder.refund_status === 'completed' ? 'bg-green-100 text-green-800' :
+                          returnOrder.refund_status === 'processed' ? 'bg-blue-100 text-blue-800' :
+                          'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {returnOrder.refund_status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {new Date(returnOrder.return_date).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <button
+                          onClick={() => downloadReturnInvoice(returnOrder)}
+                          className="text-red-600 hover:text-red-900 transition flex items-center gap-1"
+                          title="Download Return Invoice PDF"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          Return Invoice
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {viewDraftModalOpen && selectedDraftOrder && (
         <ViewDraftDetailsModal

@@ -1171,3 +1171,745 @@ export async function generateOrderPdf(order: Order) {
   const filename = `invoice_${order.order_number}.pdf`;
   doc.save(filename);
 }
+
+// Type definitions for Sales Return
+type ReturnItem = {
+  id: string;
+  return_id: string;
+  order_item_id: string;
+  product_id: string;
+  product_name: string;
+  product_sku: string;
+  size?: string;
+  color?: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  hsn_code?: string;
+  cgst_rate?: number;
+  sgst_rate?: number;
+  igst_rate?: number;
+  cgst_amount?: number;
+  sgst_amount?: number;
+  igst_amount?: number;
+  tax_amount?: number;
+  net_amount?: number;
+};
+
+type OrderReturn = {
+  id: string;
+  order_id: string;
+  return_number: string;
+  return_reason?: string;
+  return_status: string;
+  refund_amount: number;
+  refund_method?: string;
+  refund_status: string;
+  return_date: string;
+  processed_at?: string;
+  notes?: string;
+  created_at: string;
+  return_items?: ReturnItem[];
+  order?: Order;
+  user?: {
+    name?: string;
+    email?: string;
+    phone?: string;
+  };
+};
+
+// Generate Sales Return Invoice PDF
+export async function generateReturnInvoicePdf(returnOrder: OrderReturn) {
+  const doc = new jsPDF('portrait', 'pt', 'a4');
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const marginLeft = 40;
+  const marginRight = 40;
+  const marginTop = 40;
+  let cursorY = marginTop;
+
+  // Helper function to format INR currency
+  const formatINR = (amount: number | undefined | null) => {
+    if (amount === undefined || amount === null) return '0.00';
+    return new Intl.NumberFormat('en-IN', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(Number(amount || 0));
+  };
+
+  const formatNumber = (num: number | undefined | null) => {
+    if (num === undefined || num === null) return '0';
+    return Number(num).toFixed(2);
+  };
+
+  // Default seller information
+  const sellerInfo = {
+    name: 'Shubhamastu Shopping Mall Private Limited',
+    address: '17/397, VRC centre, Nellore, Andhra Pradesh, IN',
+    pan: 'ABFCSO076F',
+    gstin: '37ABFCS0076F1ZE',
+  };
+
+  const sellerStateCode = '37';
+
+  // Parse addresses from original order
+  const originalOrder = returnOrder.order;
+  const billingAddress = originalOrder ? parseAddress(originalOrder.billing_address || '') : { name: '', address: '', state: '', pincode: '', stateCode: '' };
+  const shippingAddress = originalOrder ? parseAddress(originalOrder.shipping_address || '') : { name: '', address: '', state: '', pincode: '', stateCode: '' };
+  
+  const buyerStateCode = shippingAddress.stateCode || billingAddress.stateCode || '';
+  let finalBuyerStateCode = buyerStateCode;
+  
+  if (!finalBuyerStateCode && shippingAddress.state) {
+    const stateNameToCode: { [key: string]: string } = {
+      'TELANGANA': '36',
+      'ANDHRA PRADESH': '37',
+      'TAMIL NADU': '33',
+      'KARNATAKA': '29',
+      'KERALA': '32',
+      'MAHARASHTRA': '27',
+      'GUJARAT': '24',
+      'RAJASTHAN': '08',
+      'PUNJAB': '03',
+      'HARYANA': '06',
+      'UTTAR PRADESH': '09',
+      'WEST BENGAL': '19',
+      'BIHAR': '10',
+      'ODISHA': '21',
+      'MADHYA PRADESH': '23',
+      'JHARKHAND': '20',
+      'ASSAM': '18',
+      'CHHATTISGARH': '22',
+      'HIMACHAL PRADESH': '02',
+      'UTTARAKHAND': '05',
+      'GOA': '30',
+      'DELHI': '07',
+    };
+    const stateUpper = shippingAddress.state.toUpperCase();
+    finalBuyerStateCode = stateNameToCode[stateUpper] || '';
+  }
+  
+  const isInterState = finalBuyerStateCode !== '' && sellerStateCode !== finalBuyerStateCode;
+
+  const returnDate = new Date(returnOrder.return_date || returnOrder.created_at);
+  const formattedDate = returnDate.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const returnInvoiceNumber = `RET-INV-${returnOrder.return_number}`;
+  const originalInvoiceNumber = originalOrder ? `INV-${originalOrder.order_number}` : 'N/A';
+
+  // Totals will be recalculated during item processing
+  let totalNetAmount = 0;
+  let totalTaxAmount = 0;
+  let totalCGST = 0;
+  let totalSGST = 0;
+  let totalIGST = 0;
+
+  const items = returnOrder.return_items || [];
+
+  if (items.length === 0) {
+    console.error('No return items found for return:', returnOrder.return_number);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(255, 0, 0);
+    doc.text('ERROR: No return items found for this return', marginLeft, cursorY);
+    cursorY += 20;
+    doc.setTextColor(0, 0, 0);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text(`Return Number: ${returnOrder.return_number}`, marginLeft, cursorY);
+    doc.save(`return_invoice_${returnOrder.return_number}_error.pdf`);
+    return;
+  }
+
+  // Header Section with Box
+  const headerBoxHeight = 80;
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.5);
+  doc.rect(marginLeft, 20, pageWidth - marginLeft - marginRight, headerBoxHeight);
+
+  // Add logo
+  const logoUrl = '/label.png';
+  const logoHeight = 60;
+  const logoWidth = 150;
+
+  try {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = reject;
+      img.src = logoUrl;
+      
+      if (img.complete) {
+        resolve(null);
+      }
+    });
+    
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.drawImage(img, 0, 0);
+      const dataUrl = canvas.toDataURL('image/png');
+      const logoY = 20 + (headerBoxHeight - logoHeight) / 2;
+      doc.addImage(dataUrl, 'PNG', marginLeft + 10, logoY, logoWidth, logoHeight);
+      
+      // Add domain name below logo
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      const domainY = logoY + logoHeight + 5;
+      const logoCenterX = marginLeft + 10 + (logoWidth / 2);
+      const domainText = 'only2u.app';
+      const domainTextWidth = doc.getTextWidth(domainText);
+      doc.text(domainText, logoCenterX - (domainTextWidth / 2), domainY);
+      doc.setTextColor(0, 0, 0);
+    }
+  } catch (error) {
+    console.warn('Could not load logo image:', error);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(28);
+    doc.setTextColor(0, 0, 0);
+    const textY = 20 + headerBoxHeight / 2;
+    doc.text('ONLY2U', marginLeft + 10, textY);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    const domainY = textY + 15;
+    doc.text('only2u.app', marginLeft + 10, domainY);
+    doc.setTextColor(0, 0, 0);
+  }
+
+  // Title: SALES RETURN INVOICE (centered, red color)
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(20);
+  doc.setTextColor(220, 20, 60); // Crimson red
+  const titleText = 'SALES RETURN INVOICE';
+  const titleWidth = doc.getTextWidth(titleText);
+  const titleY = 20 + (headerBoxHeight / 2) - 8;
+  doc.text(titleText, (pageWidth - titleWidth) / 2, titleY);
+  doc.setTextColor(0, 0, 0);
+  
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  const subtitleY = titleY + 12;
+  doc.text('(Credit Note)', pageWidth / 2, subtitleY, { align: 'center' });
+
+  // Return Invoice Number and Date (right side)
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  let infoY = 30;
+  
+  // Return Invoice Number - Label and value on separate lines
+  doc.text(`Return Invoice No:`, pageWidth - marginRight - 5, infoY, { align: 'right' });
+  infoY += 12;
+  doc.setFontSize(8);
+  const returnInvLines = doc.splitTextToSize(returnInvoiceNumber, 180);
+  returnInvLines.forEach((line: string, idx: number) => {
+    doc.text(line, pageWidth - marginRight - 5, infoY + (idx * 10), { align: 'right' });
+  });
+  infoY += returnInvLines.length * 10;
+  
+  // Return Date
+  doc.setFontSize(9);
+  doc.text(`Return Date: ${formattedDate}`, pageWidth - marginRight - 5, infoY, { align: 'right' });
+  infoY += 15;
+  
+  if (originalOrder) {
+    // Original Invoice - Label and value on separate lines
+    doc.setFontSize(9);
+    doc.text(`Original Invoice:`, pageWidth - marginRight - 5, infoY, { align: 'right' });
+    infoY += 12;
+    doc.setFontSize(8);
+    const origInvLines = doc.splitTextToSize(originalInvoiceNumber, 180);
+    origInvLines.forEach((line: string, idx: number) => {
+      doc.text(line, pageWidth - marginRight - 5, infoY + (idx * 10), { align: 'right' });
+    });
+    infoY += origInvLines.length * 10;
+    
+    // Original Date
+    doc.setFontSize(9);
+    const originalDate = new Date(originalOrder.created_at);
+    const originalFormattedDate = originalDate.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    doc.text(`Original Date: ${originalFormattedDate}`, pageWidth - marginRight - 5, infoY, { align: 'right' });
+  }
+
+  cursorY = marginTop + headerBoxHeight + 20;
+
+  // Seller Information Box
+  const sellerBoxY = cursorY;
+  const sellerBoxHeight = 75;
+  const sellerBoxWidth = 180;
+
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.3);
+  doc.rect(marginLeft, sellerBoxY, sellerBoxWidth, sellerBoxHeight);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.text('RETURNED BY', marginLeft + 5, sellerBoxY + 8);
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.2);
+  doc.line(marginLeft + 2, sellerBoxY + 12, marginLeft + sellerBoxWidth - 2, sellerBoxY + 12);
+
+  let sellerTextY = sellerBoxY + 20;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text(sellerInfo.name, marginLeft + 5, sellerTextY);
+  sellerTextY += 10;
+
+  const sellerAddressLines = doc.splitTextToSize(sellerInfo.address, sellerBoxWidth - 10);
+  sellerAddressLines.forEach((line: string) => {
+    doc.text(line, marginLeft + 5, sellerTextY);
+    sellerTextY += 9;
+  });
+
+  doc.text(`PAN: ${sellerInfo.pan}`, marginLeft + 5, sellerTextY);
+  sellerTextY += 9;
+  doc.text(`GSTIN: ${sellerInfo.gstin}`, marginLeft + 5, sellerTextY);
+
+  // Buyer Information Box (right side)
+  const buyerBoxY = cursorY;
+  const buyerBoxHeight = 75;
+  const buyerBoxWidth = 180;
+  const buyerBoxX = pageWidth - marginRight - buyerBoxWidth;
+
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.3);
+  doc.rect(buyerBoxX, buyerBoxY, buyerBoxWidth, buyerBoxHeight);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.text('RETURNED TO', buyerBoxX + 5, buyerBoxY + 8);
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.2);
+  doc.line(buyerBoxX + 2, buyerBoxY + 12, buyerBoxX + buyerBoxWidth - 2, buyerBoxY + 12);
+
+  let buyerTextY = buyerBoxY + 20;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  
+  const buyerName = returnOrder.user?.name || billingAddress.name || shippingAddress.name || 'Customer';
+  doc.text(buyerName, buyerBoxX + 5, buyerTextY);
+  buyerTextY += 10;
+
+  const buyerAddress = shippingAddress.address || billingAddress.address || '';
+  if (buyerAddress) {
+    const buyerAddressLines = doc.splitTextToSize(buyerAddress, buyerBoxWidth - 10);
+    buyerAddressLines.forEach((line: string) => {
+      doc.text(line, buyerBoxX + 5, buyerTextY);
+      buyerTextY += 9;
+    });
+  }
+
+  if (returnOrder.user?.phone) {
+    doc.text(`Phone: ${returnOrder.user.phone}`, buyerBoxX + 5, buyerTextY);
+    buyerTextY += 9;
+  }
+  if (returnOrder.user?.email) {
+    doc.text(`Email: ${returnOrder.user.email}`, buyerBoxX + 5, buyerTextY);
+  }
+
+  cursorY = sellerBoxY + sellerBoxHeight + 20;
+
+  // Return Reason
+  if (returnOrder.return_reason) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text('Return Reason:', marginLeft, cursorY);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    const reasonLines = doc.splitTextToSize(returnOrder.return_reason, pageWidth - marginLeft - marginRight);
+    reasonLines.forEach((line: string) => {
+      doc.text(line, marginLeft + 80, cursorY);
+      cursorY += 12;
+    });
+    cursorY += 10;
+  }
+
+  // Item Particulars Section - Match regular invoice layout
+  if (items && items.length > 0) {
+    const itemsSectionY = cursorY;
+    
+    // Add some space before the section
+    cursorY += 5;
+    
+    // Header
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text('ITEM PARTICULARS', marginLeft + 5, cursorY + 12);
+    
+    cursorY += 25;
+    
+    // Table Headers - Match the invoice format
+    const headerHeight = 32; // Increased height for better visibility
+    const headerY = cursorY;
+    
+    doc.setDrawColor(180, 180, 180);
+    doc.setFillColor(245, 245, 245);
+    doc.setLineWidth(0.5);
+    doc.rect(marginLeft, headerY, pageWidth - marginLeft - marginRight, headerHeight, 'FD');
+    
+    // Draw vertical column separators in header
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.2);
+    doc.line(marginLeft + 25, headerY, marginLeft + 25, headerY + headerHeight);
+    doc.line(marginLeft + 158, headerY, marginLeft + 158, headerY + headerHeight);
+    doc.line(marginLeft + 206, headerY, marginLeft + 206, headerY + headerHeight);
+    doc.line(marginLeft + 244, headerY, marginLeft + 244, headerY + headerHeight);
+    doc.line(marginLeft + 272, headerY, marginLeft + 272, headerY + headerHeight);
+    doc.line(marginLeft + 318, headerY, marginLeft + 318, headerY + headerHeight);
+    doc.line(marginLeft + 392, headerY, marginLeft + 392, headerY + headerHeight);
+    doc.line(marginLeft + 452, headerY, marginLeft + 452, headerY + headerHeight);
+    
+    // Center text vertically in header
+    const headerTextY = headerY + (headerHeight / 2) + 3; // Center vertically with slight adjustment
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(0, 0, 0);
+    
+    // Column positions (match regular invoice)
+    doc.text('Sl. No', marginLeft + 5, headerTextY);
+    doc.text('Description', marginLeft + 28, headerTextY);
+    doc.text('Unit Price', marginLeft + 161, headerTextY);
+    doc.text('Discount', marginLeft + 209, headerTextY);
+    doc.text('Qty', marginLeft + 247, headerTextY);
+    doc.text('Net Amount', marginLeft + 275, headerTextY);
+    doc.text('Tax Rate', marginLeft + 321, headerTextY);
+    doc.text('Total Tax', marginLeft + 395, headerTextY);
+    doc.text('Total Amount', marginLeft + 455, headerTextY);
+    
+    cursorY = headerY + headerHeight + 2; // Small gap after header
+    
+    // Items List
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    
+    items.forEach((item, index) => {
+      // Check if we need a new page
+      if (cursorY > pageHeight - 100) {
+        doc.addPage();
+        cursorY = marginTop + 20;
+      }
+      
+      const productName = item.product_name || 'Product';
+      const quantity = Number(item.quantity) || 0;
+      const unitPrice = Number(item.unit_price) || 0;
+      const productSku = item.product_sku || '';
+      const size = item.size || '';
+      const color = item.color || '';
+      const hsnCode = item.hsn_code || '';
+      const discount = Number(item.discount) || 0;
+      
+      // Calculate taxes based on unit price (same logic as regular invoice)
+      const calculateTaxForItem = (unitPrice: number, isInterState: boolean) => {
+        let cgstRate = 0;
+        let sgstRate = 0;
+        let igstRate = 0;
+        
+        if (unitPrice <= 2500) {
+          if (isInterState) {
+            igstRate = 5;
+          } else {
+            cgstRate = 2.5;
+            sgstRate = 2.5;
+          }
+        } else {
+          if (isInterState) {
+            igstRate = 18;
+          } else {
+            cgstRate = 9;
+            sgstRate = 9;
+          }
+        }
+        
+        return { cgstRate, sgstRate, igstRate };
+      };
+      
+      const { cgstRate, sgstRate, igstRate } = calculateTaxForItem(unitPrice, isInterState);
+      
+      // Calculate amounts
+      const netAmount = item.net_amount || (unitPrice * quantity - discount);
+      const cgstAmount = item.cgst_amount || (netAmount * cgstRate / 100);
+      const sgstAmount = item.sgst_amount || (netAmount * sgstRate / 100);
+      const igstAmount = item.igst_amount || (netAmount * igstRate / 100);
+      const taxAmount = item.tax_amount || (cgstAmount + sgstAmount + igstAmount);
+      const totalAmount = netAmount + taxAmount;
+      
+      // Accumulate totals
+      totalNetAmount += netAmount;
+      totalTaxAmount += taxAmount;
+      totalCGST += cgstAmount;
+      totalSGST += sgstAmount;
+      totalIGST += igstAmount;
+      
+      // Build description (HSN code will be shown below description, not in separate column)
+      const descriptionParts = [productName];
+      if (productSku) descriptionParts.push(`SKU: ${productSku}`);
+      if (size) descriptionParts.push(`Size: ${size}`);
+      if (color) descriptionParts.push(`Color: ${color}`);
+      const description = descriptionParts.join(' | ');
+      
+      // Wrap description if too long (wider column now)
+      const maxDescWidth = 125; // Width for description column (130pt - 5pt padding)
+      const descLines = doc.splitTextToSize(description, maxDescWidth);
+      
+      // Calculate row height: base height + description lines + HSN line + tax rate breakdown, with padding
+      const baseHeight = 20; // Base height for single line items
+      const descHeight = Math.max(0, (descLines.length - 1) * 11); // Additional height for multi-line description
+      const hsnHeight = hsnCode ? 11 : 0; // Space for HSN code below description
+      // Add extra height if showing CGST+SGST breakdown (takes 2 lines)
+      const taxRateHeight = (!isInterState && (cgstRate > 0 || sgstRate > 0)) ? 9 : 0;
+      const rowPadding = 8; // Padding top and bottom
+      const itemHeight = baseHeight + descHeight + hsnHeight + taxRateHeight + rowPadding;
+      
+      // Starting Y position for this row (centered vertically)
+      const rowStartY = cursorY;
+      
+      // Draw item row background (white, alternating for readability)
+      if (index % 2 === 0) {
+        doc.setFillColor(255, 255, 255);
+      } else {
+        doc.setFillColor(250, 250, 250);
+      }
+      doc.rect(marginLeft, rowStartY, pageWidth - marginLeft - marginRight, itemHeight, 'F');
+      
+      // Draw vertical column separators
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.2);
+      // Sl. No separator
+      doc.line(marginLeft + 25, rowStartY, marginLeft + 25, rowStartY + itemHeight);
+      // Description separator
+      doc.line(marginLeft + 158, rowStartY, marginLeft + 158, rowStartY + itemHeight);
+      // Unit Price separator
+      doc.line(marginLeft + 206, rowStartY, marginLeft + 206, rowStartY + itemHeight);
+      // Discount separator
+      doc.line(marginLeft + 244, rowStartY, marginLeft + 244, rowStartY + itemHeight);
+      // Qty separator
+      doc.line(marginLeft + 272, rowStartY, marginLeft + 272, rowStartY + itemHeight);
+      // Net Amount separator
+      doc.line(marginLeft + 318, rowStartY, marginLeft + 318, rowStartY + itemHeight);
+      // Tax Rate separator
+      doc.line(marginLeft + 392, rowStartY, marginLeft + 392, rowStartY + itemHeight);
+      // Total Tax separator
+      doc.line(marginLeft + 452, rowStartY, marginLeft + 452, rowStartY + itemHeight);
+      
+      // Calculate center Y for this row
+      const rowCenterY = rowStartY + (itemHeight / 2);
+      const rowTopY = rowStartY + 6; // Top padding
+      
+      // Serial Number (centered vertically)
+      doc.setTextColor(0, 0, 0);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.text(String(index + 1), marginLeft + 5, rowTopY + 7);
+      
+      // Description (may span multiple lines, starts from top)
+      let descY = rowTopY;
+      descLines.forEach((line: string, lineIndex: number) => {
+        doc.text(line, marginLeft + 28, descY);
+        if (lineIndex < descLines.length - 1) {
+          descY += 11;
+        }
+      });
+      
+      // HSN Code (shown below description, not in separate column)
+      if (hsnCode) {
+        doc.setFontSize(8);
+        doc.setTextColor(100, 100, 100);
+        doc.text(`HSN: ${hsnCode}`, marginLeft + 28, descY + 11);
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(9);
+      }
+      
+      // Unit Price (centered vertically)
+      doc.setFontSize(9);
+      doc.text(formatINR(unitPrice), marginLeft + 161, rowTopY + 7);
+      
+      // Discount (centered vertically)
+      doc.text(formatINR(discount), marginLeft + 209, rowTopY + 7);
+      
+      // Quantity (centered vertically)
+      doc.text(String(quantity), marginLeft + 247, rowTopY + 7);
+      
+      // Net Amount (centered vertically)
+      doc.text(formatINR(netAmount), marginLeft + 275, rowTopY + 7);
+      
+      // Tax Rate (centered vertically) - Show breakdown with amounts for CGST+SGST
+      // Constrain text width to prevent overflow into Total Tax column
+      doc.setFontSize(7);
+      let taxRateY = rowTopY + 7;
+      const taxRateMaxWidth = 65; // Maximum width for tax rate column (392 - 321 - 6pt padding)
+      
+      if (isInterState) {
+        // Interstate: Show IGST
+        if (igstRate > 0 && igstAmount > 0) {
+          const igstText = `IGST ${formatNumber(igstRate)}% ${formatINR(igstAmount)}`;
+          const igstLines = doc.splitTextToSize(igstText, taxRateMaxWidth);
+          igstLines.forEach((line: string, idx: number) => {
+            doc.text(line, marginLeft + 321, taxRateY);
+            if (idx < igstLines.length - 1) taxRateY += 9;
+          });
+        } else {
+          doc.text('0%', marginLeft + 321, taxRateY);
+        }
+      } else {
+        // Intrastate: Always show CGST and SGST (even if 0 for some items in mixed orders)
+        // Show CGST and SGST percentages with amounts separately on separate lines
+        if (cgstRate > 0 && cgstAmount > 0) {
+          const cgstText = `CGST ${formatNumber(cgstRate)}% ${formatINR(cgstAmount)}`;
+          const cgstLines = doc.splitTextToSize(cgstText, taxRateMaxWidth);
+          cgstLines.forEach((line: string, idx: number) => {
+            doc.text(line, marginLeft + 321, taxRateY);
+            if (idx < cgstLines.length - 1) taxRateY += 9;
+          });
+          taxRateY += 9;
+        }
+        if (sgstRate > 0 && sgstAmount > 0) {
+          const sgstText = `SGST ${formatNumber(sgstRate)}% ${formatINR(sgstAmount)}`;
+          const sgstLines = doc.splitTextToSize(sgstText, taxRateMaxWidth);
+          sgstLines.forEach((line: string, idx: number) => {
+            doc.text(line, marginLeft + 321, taxRateY);
+            if (idx < sgstLines.length - 1) taxRateY += 9;
+          });
+        }
+        // If both CGST and SGST are 0 or missing, show 0%
+        if ((!cgstRate || cgstRate === 0) && (!sgstRate || sgstRate === 0) && 
+            (!cgstAmount || cgstAmount === 0) && (!sgstAmount || sgstAmount === 0)) {
+          doc.text('0%', marginLeft + 321, taxRateY);
+        }
+      }
+      doc.setFontSize(9);
+      
+      // Total Tax (centered vertically)
+      doc.text(formatINR(taxAmount), marginLeft + 395, rowTopY + 7);
+      
+      // Total Amount (centered vertically, bold, red for refund)
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(220, 20, 60); // Red color for refund amount
+      doc.text(formatINR(-totalAmount), marginLeft + 455, rowTopY + 7);
+      doc.setTextColor(0, 0, 0);
+      doc.setFont('helvetica', 'normal');
+      
+      // Move to next item with proper spacing
+      cursorY = rowStartY + itemHeight;
+      
+      // Add separator line between items
+      if (index < items.length - 1) {
+        doc.setDrawColor(220, 220, 220);
+        doc.setLineWidth(0.2);
+        doc.line(marginLeft + 5, cursorY, marginLeft + pageWidth - marginLeft - marginRight - 5, cursorY);
+        cursorY += 3; // Small gap after separator
+      }
+    });
+    
+    // Draw bottom border
+    doc.setDrawColor(180, 180, 180);
+    doc.setLineWidth(0.5);
+    doc.line(marginLeft, cursorY, marginLeft + pageWidth - marginLeft - marginRight, cursorY);
+    
+    cursorY += 20; // More space after table
+  } else {
+    // No items message
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text('No items found in this return.', marginLeft, cursorY);
+    cursorY += 20;
+  }
+
+  // Totals Section
+  const totalsStartY = cursorY + 10;
+  const totalsWidth = 220; // Increased width to accommodate longer labels
+  const totalsX = pageWidth - marginRight - totalsWidth;
+  const labelX = totalsX + 5;
+  const valueX = totalsX + totalsWidth - 5; // Right edge of totals box
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+
+  let totalY = totalsStartY;
+  doc.text('Sub Total:', labelX, totalY);
+  doc.text(formatINR(-totalNetAmount), valueX, totalY, { align: 'right' });
+  totalY += 15;
+
+  if (totalCGST > 0) {
+    doc.text('CGST:', labelX, totalY);
+    doc.text(formatINR(-totalCGST), valueX, totalY, { align: 'right' });
+    totalY += 15;
+  }
+  if (totalSGST > 0) {
+    doc.text('SGST:', labelX, totalY);
+    doc.text(formatINR(-totalSGST), valueX, totalY, { align: 'right' });
+    totalY += 15;
+  }
+  if (totalIGST > 0) {
+    doc.text('IGST:', labelX, totalY);
+    doc.text(formatINR(-totalIGST), valueX, totalY, { align: 'right' });
+    totalY += 15;
+  }
+
+  doc.setLineWidth(0.5);
+  doc.line(totalsX, totalY, totalsX + totalsWidth, totalY);
+  totalY += 12; // Increased spacing after line
+
+  // Calculate total refund amount
+  const totalRefundAmount = totalNetAmount + totalTaxAmount;
+  
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.setTextColor(220, 20, 60); // Red for refund
+  // Put label and value on separate lines to prevent overlap
+  doc.text('Total Refund Amount:', labelX, totalY);
+  totalY += 15;
+  doc.setFontSize(12);
+  doc.text(formatINR(-totalRefundAmount), valueX, totalY, { align: 'right' });
+  doc.setTextColor(0, 0, 0);
+  doc.setFont('helvetica', 'normal');
+
+  // Amount in Words
+  totalY += 20;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.text('Refund Amount in Words:', marginLeft, totalY);
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(9);
+  const amountWords = formatAmountInWords(totalRefundAmount);
+  const wordsLines = doc.splitTextToSize(amountWords, pageWidth - marginLeft - marginRight);
+  wordsLines.forEach((line: string, idx: number) => {
+    doc.text(line, marginLeft + 150, totalY + (idx * 12));
+  });
+
+  // Refund Method
+  totalY += wordsLines.length * 12 + 15;
+  if (returnOrder.refund_method) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text(`Refund Method: ${returnOrder.refund_method}`, marginLeft, totalY);
+    totalY += 15;
+  }
+
+  // Footer Notes
+  totalY += 20;
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(8);
+  const footerNotes = [
+    'This is a credit note for the returned goods',
+    'The refund amount will be processed as per the refund method specified',
+    'Please retain this document for your records',
+  ];
+  footerNotes.forEach((note, index) => {
+    doc.text(note, marginLeft, totalY);
+    totalY += 10;
+  });
+
+  // Page Number
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text('Page 1 of 1', pageWidth - marginRight, pageHeight - 20, { align: 'right' });
+
+  doc.save(`return_invoice_${returnOrder.return_number}.pdf`);
+}
