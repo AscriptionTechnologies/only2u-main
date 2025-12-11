@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { supabase } from "../../../lib/supabase";
 import { uploadFile } from "../../../lib/uploadUtils";
+import { generateInfluencerPaymentVoucher } from "../../../lib/pdfUtils";
 
 type InfluencerProfile = {
   id: string;
@@ -85,6 +86,18 @@ export default function InfluencerProfilesPage() {
   const [profilePhotoPreview, setProfilePhotoPreview] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const [showVoucherModal, setShowVoucherModal] = useState(false);
+  const [selectedInfluencer, setSelectedInfluencer] = useState<InfluencerProfile | null>(null);
+  const [voucherForm, setVoucherForm] = useState({
+    billNumber: '',
+    date: new Date().toISOString().split('T')[0],
+    purpose: 'Influencer Payment',
+    detailedPurpose: '',
+    amount: '',
+    referredByName: '',
+    cashReceiverName: '',
+    cashReceiverPhone: '',
+  });
 
   useEffect(() => {
     fetchProfiles();
@@ -303,6 +316,51 @@ export default function InfluencerProfilesPage() {
       }
     } else {
       fetchProfiles();
+    }
+  };
+
+  const openVoucherModal = (profile: InfluencerProfile) => {
+    setSelectedInfluencer(profile);
+    // Generate bill number (you can customize this logic)
+    const billNumber = `VCH-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`;
+    setVoucherForm({
+      billNumber,
+      date: new Date().toISOString().split('T')[0],
+      purpose: 'Influencer Payment',
+      detailedPurpose: `Payment for influencer services - ${profile.name}`,
+      amount: profile.total_earnings.toString(),
+      referredByName: '',
+      cashReceiverName: profile.name,
+      cashReceiverPhone: profile.contact_phone || '',
+    });
+    setShowVoucherModal(true);
+  };
+
+  const generateVoucher = async () => {
+    if (!selectedInfluencer) return;
+    
+    if (!voucherForm.billNumber || !voucherForm.date || !voucherForm.amount) {
+      setError("Bill Number, Date, and Amount are required.");
+      return;
+    }
+
+    try {
+      await generateInfluencerPaymentVoucher({
+        billNumber: voucherForm.billNumber,
+        date: new Date(voucherForm.date).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+        influencerName: selectedInfluencer.name,
+        purpose: voucherForm.purpose,
+        detailedPurpose: voucherForm.detailedPurpose,
+        amount: parseFloat(voucherForm.amount) || 0,
+        referredByName: voucherForm.referredByName,
+        cashReceiverName: voucherForm.cashReceiverName,
+        cashReceiverPhone: voucherForm.cashReceiverPhone,
+      });
+      setShowVoucherModal(false);
+      setSelectedInfluencer(null);
+    } catch (err) {
+      console.error("Error generating voucher:", err);
+      setError("Failed to generate voucher. Please try again.");
     }
   };
 
@@ -805,6 +863,13 @@ export default function InfluencerProfilesPage() {
                     </td>
                     <td className="px-6 py-4 text-right text-sm font-medium space-x-3">
                       <button
+                        onClick={() => openVoucherModal(profile)}
+                        className="text-blue-600 hover:text-blue-700"
+                        title="Generate Payment Voucher"
+                      >
+                        Voucher
+                      </button>
+                      <button
                         onClick={() => toggleActiveStatus(profile)}
                         className={`${
                           profile.is_active
@@ -834,6 +899,148 @@ export default function InfluencerProfilesPage() {
           </table>
         </div>
       </div>
+
+      {/* Voucher Modal */}
+      {showVoucherModal && selectedInfluencer && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">
+              Generate Payment Voucher - {selectedInfluencer.name}
+            </h2>
+            
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    Bill Number *
+                  </label>
+                  <input
+                    type="text"
+                    value={voucherForm.billNumber}
+                    onChange={(e) => setVoucherForm({ ...voucherForm, billNumber: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A]"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    Date *
+                  </label>
+                  <input
+                    type="date"
+                    value={voucherForm.date}
+                    onChange={(e) => setVoucherForm({ ...voucherForm, date: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A]"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  Purpose
+                </label>
+                <input
+                  type="text"
+                  value={voucherForm.purpose}
+                  onChange={(e) => setVoucherForm({ ...voucherForm, purpose: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  Detailed Purpose
+                </label>
+                <textarea
+                  value={voucherForm.detailedPurpose}
+                  onChange={(e) => setVoucherForm({ ...voucherForm, detailedPurpose: e.target.value })}
+                  rows={3}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  Amount *
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={voucherForm.amount}
+                  onChange={(e) => setVoucherForm({ ...voucherForm, amount: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A]"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  Referred By Name
+                </label>
+                <input
+                  type="text"
+                  value={voucherForm.referredByName}
+                  onChange={(e) => setVoucherForm({ ...voucherForm, referredByName: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    Cash Receiver Name
+                  </label>
+                  <input
+                    type="text"
+                    value={voucherForm.cashReceiverName}
+                    onChange={(e) => setVoucherForm({ ...voucherForm, cashReceiverName: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    Cash Receiver Phone
+                  </label>
+                  <input
+                    type="tel"
+                    value={voucherForm.cashReceiverPhone}
+                    onChange={(e) => setVoucherForm({ ...voucherForm, cashReceiverPhone: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A]"
+                  />
+                </div>
+              </div>
+
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg px-4 py-2">
+                  {error}
+                </div>
+              )}
+
+              <div className="flex gap-3 justify-end pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowVoucherModal(false);
+                    setSelectedInfluencer(null);
+                    setError(null);
+                  }}
+                  className="px-4 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={generateVoucher}
+                  className="px-4 py-2 rounded-lg bg-[#F53F7A] text-white hover:bg-[#F53F7A]/90 transition"
+                >
+                  Generate Voucher
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

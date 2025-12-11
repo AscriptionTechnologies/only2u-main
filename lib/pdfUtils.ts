@@ -148,7 +148,20 @@ function parseAddress(address: string) {
   return { name, address: addressLines, state, pincode, stateCode };
 }
 
-export async function generateOrderPdf(order: Order) {
+export async function generateOrderPdf(
+  order: Order, 
+  customSellerInfo?: { name: string; address: string; pan: string; gstin: string },
+  options?: {
+    useBilledBy?: boolean; // Use "BILLED BY" instead of "SOLD BY"
+    useBilledTo?: boolean; // Use "BILLED TO" instead of billing/shipping address
+    hideShippingAddress?: boolean; // Hide shipping address section
+    hideOrderDetails?: boolean; // Hide order details section
+    hideUnitPrice?: boolean; // Hide unit price column
+    hideQty?: boolean; // Hide quantity column
+    hideUnit?: boolean; // Hide unit of measurement column
+    hideTransactionDetails?: boolean; // Hide transaction details section
+  }
+) {
   // Debug: Log order data to see what we're receiving
   console.log('Generating PDF for order:', order.order_number);
   console.log('Order items count:', order.order_items?.length || 0);
@@ -176,8 +189,8 @@ export async function generateOrderPdf(order: Order) {
     }).format(Number(amount || 0));
   };
 
-  // Default seller information (can be made configurable)
-  const sellerInfo = {
+  // Default seller information (can be overridden)
+  const sellerInfo = customSellerInfo || {
     name: 'Shubhamastu Shopping Mall Private Limited',
     address: '17/397, VRC centre, Nellore, Andhra Pradesh, IN',
     pan: 'ABFCSO076F',
@@ -191,8 +204,9 @@ export async function generateOrderPdf(order: Order) {
   const placeOfDelivery = shippingAddress.state || 'N/A';
 
   // Determine supply type (InterState or IntraState)
-  // Seller state code is '37' (Andhra Pradesh) from GSTIN 37ABFCS0076F1ZE
-  const sellerStateCode = '37';
+  // Seller state code extracted from GSTIN (first 2 digits)
+  // Default is '37' (Andhra Pradesh) for Shubhamastu, '36' (Telangana) for Only2U
+  const sellerStateCode = sellerInfo.gstin.substring(0, 2) || '37';
   const buyerStateCode = shippingAddress.stateCode || billingAddress.stateCode || '';
   
   // If buyer state code is not available, try to extract from state name
@@ -482,155 +496,203 @@ export async function generateOrderPdf(order: Order) {
   
   cursorY = sellerBoxY + sellerBoxHeight + 15;
 
-  // Billing and Shipping Address Boxes (Side by Side) - Fixed Layout
-  const addressBoxY = cursorY;
-  const addressBoxHeight = 80;
-  const availableWidth = pageWidth - marginLeft - marginRight;
-  const addressGap = 15;
-  // Calculate box width to fit three boxes with gaps
-  const addressBoxWidth = Math.floor((availableWidth - (addressGap * 2)) / 3);
-  
-  // Billing Address Box (Left)
-  const billingX = marginLeft;
-  doc.setDrawColor(200, 200, 200);
-  doc.setLineWidth(0.3);
-  doc.rect(billingX, addressBoxY, addressBoxWidth, addressBoxHeight);
-  
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.text('BILLING ADDRESS', billingX + 5, addressBoxY + 8);
-  
-  doc.setDrawColor(200, 200, 200);
-  doc.setLineWidth(0.2);
-  doc.line(billingX + 2, addressBoxY + 12, billingX + addressBoxWidth - 2, addressBoxY + 12);
-  
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  let billingTextY = addressBoxY + 20;
-  doc.text(billingAddress.name || order.user?.name || 'N/A', billingX + 5, billingTextY);
-  billingTextY += 10;
-  
-  const billingAddressLines = doc.splitTextToSize(billingAddress.address || order.billing_address || 'N/A', addressBoxWidth - 10);
-  billingAddressLines.forEach((line: string) => {
-    doc.text(line, billingX + 5, billingTextY);
-    billingTextY += 9;
-  });
-  
-  if (billingAddress.stateCode) {
-    doc.text(`State Code: ${billingAddress.stateCode}`, billingX + 5, billingTextY);
-  }
+  // Billing Address Box (or BILLED TO)
+  if (!options?.hideShippingAddress && !options?.useBilledTo) {
+    // Original layout with billing and shipping addresses
+    const addressBoxY = cursorY;
+    const addressBoxHeight = 80;
+    const availableWidth = pageWidth - marginLeft - marginRight;
+    const addressGap = 15;
+    const addressBoxWidth = Math.floor((availableWidth - (addressGap * 2)) / 3);
+    
+    // Billing Address Box (Left)
+    const billingX = marginLeft;
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
+    doc.rect(billingX, addressBoxY, addressBoxWidth, addressBoxHeight);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text('BILLING ADDRESS', billingX + 5, addressBoxY + 8);
+    
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.2);
+    doc.line(billingX + 2, addressBoxY + 12, billingX + addressBoxWidth - 2, addressBoxY + 12);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    let billingTextY = addressBoxY + 20;
+    doc.text(billingAddress.name || order.user?.name || 'N/A', billingX + 5, billingTextY);
+    billingTextY += 10;
+    
+    const billingAddressLines = doc.splitTextToSize(billingAddress.address || order.billing_address || 'N/A', addressBoxWidth - 10);
+    billingAddressLines.forEach((line: string) => {
+      doc.text(line, billingX + 5, billingTextY);
+      billingTextY += 9;
+    });
+    
+    if (billingAddress.stateCode) {
+      doc.text(`State Code: ${billingAddress.stateCode}`, billingX + 5, billingTextY);
+    }
 
-  // Shipping Address Box (Middle)
-  const shippingX = billingX + addressBoxWidth + addressGap;
-  doc.setDrawColor(200, 200, 200);
-  doc.setLineWidth(0.3);
-  doc.rect(shippingX, addressBoxY, addressBoxWidth, addressBoxHeight);
-  
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.text('SHIPPING ADDRESS', shippingX + 5, addressBoxY + 8);
-  
-  doc.setDrawColor(200, 200, 200);
-  doc.setLineWidth(0.2);
-  doc.line(shippingX + 2, addressBoxY + 12, shippingX + addressBoxWidth - 2, addressBoxY + 12);
-  
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  let shippingTextY = addressBoxY + 20;
-  doc.text(shippingAddress.name || order.user?.name || 'N/A', shippingX + 5, shippingTextY);
-  shippingTextY += 10;
-  
-  const shippingAddressLines = doc.splitTextToSize(shippingAddress.address || order.shipping_address || 'N/A', addressBoxWidth - 10);
-  shippingAddressLines.forEach((line: string) => {
-    doc.text(line, shippingX + 5, shippingTextY);
-    shippingTextY += 9;
-  });
-  
-  if (shippingAddress.stateCode) {
-    doc.text(`State Code: ${shippingAddress.stateCode}`, shippingX + 5, shippingTextY);
-    shippingTextY += 9;
-  }
-  doc.setFontSize(8);
-  doc.text(`Place of Supply: ${placeOfSupply}`, shippingX + 5, shippingTextY);
-  shippingTextY += 8;
-  doc.text(`Place of Delivery: ${placeOfDelivery}`, shippingX + 5, shippingTextY);
-  
-  // Order and Invoice Details Box (Right) - Ensure it fits
-  const orderDetailsX = shippingX + addressBoxWidth + addressGap;
-  const orderDetailsBoxY = addressBoxY;
-  const orderDetailsBoxHeight = addressBoxHeight;
-  // Use remaining width for order details box
-  const orderDetailsBoxWidth = pageWidth - marginRight - orderDetailsX;
-  
-  // Only draw if there's enough space
-  if (orderDetailsBoxWidth > 100 && orderDetailsX + orderDetailsBoxWidth <= pageWidth - marginRight) {
+    // Shipping Address Box (Middle)
+    const shippingX = billingX + addressBoxWidth + addressGap;
     doc.setDrawColor(200, 200, 200);
     doc.setLineWidth(0.3);
-    doc.rect(orderDetailsX, orderDetailsBoxY, orderDetailsBoxWidth, orderDetailsBoxHeight);
+    doc.rect(shippingX, addressBoxY, addressBoxWidth, addressBoxHeight);
     
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
-    doc.text('ORDER DETAILS', orderDetailsX + 5, orderDetailsBoxY + 8);
+    doc.text('SHIPPING ADDRESS', shippingX + 5, addressBoxY + 8);
     
     doc.setDrawColor(200, 200, 200);
     doc.setLineWidth(0.2);
-    doc.line(orderDetailsX + 2, orderDetailsBoxY + 12, orderDetailsX + orderDetailsBoxWidth - 2, orderDetailsBoxY + 12);
+    doc.line(shippingX + 2, addressBoxY + 12, shippingX + addressBoxWidth - 2, addressBoxY + 12);
     
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
-    let orderTextY = orderDetailsBoxY + 20;
-    doc.text(`Order No:`, orderDetailsX + 5, orderTextY);
-    doc.setFontSize(8);
-    const orderNoLines = doc.splitTextToSize(order.order_number, orderDetailsBoxWidth - 60);
-    doc.text(orderNoLines[0] || order.order_number, orderDetailsX + orderDetailsBoxWidth - 5, orderTextY, { align: 'right' });
-    orderTextY += 10;
+    let shippingTextY = addressBoxY + 20;
+    doc.text(shippingAddress.name || order.user?.name || 'N/A', shippingX + 5, shippingTextY);
+    shippingTextY += 10;
     
-    doc.setFontSize(9);
-    doc.text(`Order Date:`, orderDetailsX + 5, orderTextY);
-    doc.text(`${formattedDate}`, orderDetailsX + orderDetailsBoxWidth - 5, orderTextY, { align: 'right' });
-    orderTextY += 10;
-    doc.text(`Invoice No:`, orderDetailsX + 5, orderTextY);
+    const shippingAddressLines = doc.splitTextToSize(shippingAddress.address || order.shipping_address || 'N/A', addressBoxWidth - 10);
+    shippingAddressLines.forEach((line: string) => {
+      doc.text(line, shippingX + 5, shippingTextY);
+      shippingTextY += 9;
+    });
+    
+    if (shippingAddress.stateCode) {
+      doc.text(`State Code: ${shippingAddress.stateCode}`, shippingX + 5, shippingTextY);
+      shippingTextY += 9;
+    }
     doc.setFontSize(8);
-    const invoiceNoLines = doc.splitTextToSize(invoiceNumber, orderDetailsBoxWidth - 60);
-    doc.text(invoiceNoLines[0] || invoiceNumber, orderDetailsX + orderDetailsBoxWidth - 5, orderTextY, { align: 'right' });
-    orderTextY += 10;
+    doc.text(`Place of Supply: ${placeOfSupply}`, shippingX + 5, shippingTextY);
+    shippingTextY += 8;
+    doc.text(`Place of Delivery: ${placeOfDelivery}`, shippingX + 5, shippingTextY);
+    
+    // Order Details Box (Right) - Only if not hidden
+    if (!options?.hideOrderDetails) {
+      const orderDetailsX = shippingX + addressBoxWidth + addressGap;
+      const orderDetailsBoxY = addressBoxY;
+      const orderDetailsBoxHeight = addressBoxHeight;
+      const orderDetailsBoxWidth = pageWidth - marginRight - orderDetailsX;
+      
+      if (orderDetailsBoxWidth > 100 && orderDetailsX + orderDetailsBoxWidth <= pageWidth - marginRight) {
+        doc.setDrawColor(200, 200, 200);
+        doc.setLineWidth(0.3);
+        doc.rect(orderDetailsX, orderDetailsBoxY, orderDetailsBoxWidth, orderDetailsBoxHeight);
+        
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.text('ORDER DETAILS', orderDetailsX + 5, orderDetailsBoxY + 8);
+        
+        doc.setDrawColor(200, 200, 200);
+        doc.setLineWidth(0.2);
+        doc.line(orderDetailsX + 2, orderDetailsBoxY + 12, orderDetailsX + orderDetailsBoxWidth - 2, orderDetailsBoxY + 12);
+        
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        let orderTextY = orderDetailsBoxY + 20;
+        doc.text(`Order No:`, orderDetailsX + 5, orderTextY);
+        doc.setFontSize(8);
+        const orderNoLines = doc.splitTextToSize(order.order_number, orderDetailsBoxWidth - 60);
+        doc.text(orderNoLines[0] || order.order_number, orderDetailsX + orderDetailsBoxWidth - 5, orderTextY, { align: 'right' });
+        orderTextY += 10;
+        
+        doc.setFontSize(9);
+        doc.text(`Order Date:`, orderDetailsX + 5, orderTextY);
+        doc.text(`${formattedDate}`, orderDetailsX + orderDetailsBoxWidth - 5, orderTextY, { align: 'right' });
+        orderTextY += 10;
+        doc.text(`Invoice No:`, orderDetailsX + 5, orderTextY);
+        doc.setFontSize(8);
+        const invoiceNoLines = doc.splitTextToSize(invoiceNumber, orderDetailsBoxWidth - 60);
+        doc.text(invoiceNoLines[0] || invoiceNumber, orderDetailsX + orderDetailsBoxWidth - 5, orderTextY, { align: 'right' });
+        orderTextY += 10;
+        doc.setFontSize(9);
+        doc.text(`Invoice Date:`, orderDetailsX + 5, orderTextY);
+        doc.text(`${formattedDate}`, orderDetailsX + orderDetailsBoxWidth - 5, orderTextY, { align: 'right' });
+      }
+    }
+    
+    cursorY = addressBoxY + addressBoxHeight + 20;
+  } else if (options?.useBilledTo) {
+    // Simplified layout: Just BILLED TO box
+    const billedToBoxY = cursorY;
+    const billedToBoxHeight = 75;
+    const billedToBoxWidth = 180;
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
+    doc.rect(marginLeft, billedToBoxY, billedToBoxWidth, billedToBoxHeight);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(0, 0, 0);
+    doc.text('BILLED TO', marginLeft + 5, billedToBoxY + 8);
+    
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.2);
+    doc.line(marginLeft + 2, billedToBoxY + 12, marginLeft + billedToBoxWidth - 2, billedToBoxY + 12);
+    
+    doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
-    doc.text(`Invoice Date:`, orderDetailsX + 5, orderTextY);
-    doc.text(`${formattedDate}`, orderDetailsX + orderDetailsBoxWidth - 5, orderTextY, { align: 'right' });
+    let billedToTextY = billedToBoxY + 20;
+    doc.text(billingAddress.name || order.user?.name || 'N/A', marginLeft + 5, billedToTextY);
+    billedToTextY += 10;
+    
+    const billedToAddressLines = doc.splitTextToSize(billingAddress.address || order.billing_address || 'N/A', billedToBoxWidth - 10);
+    billedToAddressLines.forEach((line: string) => {
+      doc.text(line, marginLeft + 5, billedToTextY);
+      billedToTextY += 9;
+    });
+    
+    if (billingAddress.stateCode) {
+      doc.text(`State Code: ${billingAddress.stateCode}`, marginLeft + 5, billedToTextY);
+      billedToTextY += 9;
+    }
+    // Try to get GSTIN from order user or vendor info if available
+    const vendorGSTIN = (order.user as any)?.gstin || (order as any)?.vendorGSTIN;
+    if (vendorGSTIN) {
+      doc.text(`GSTIN: ${vendorGSTIN}`, marginLeft + 5, billedToTextY);
+    }
+    
+    cursorY = billedToBoxY + billedToBoxHeight + 15;
   } else {
-    // If order details box doesn't fit, place it below addresses
-    const orderDetailsBoxYBelow = addressBoxY + addressBoxHeight + 15;
-    const orderDetailsBoxHeightBelow = 50;
-    const orderDetailsBoxWidthBelow = 180;
-    const orderDetailsXBelow = pageWidth - marginRight - orderDetailsBoxWidthBelow;
+    // Just billing address, no shipping
+    const addressBoxY = cursorY;
+    const addressBoxHeight = 80;
+    const addressBoxWidth = 180;
     
+    const billingX = marginLeft;
     doc.setDrawColor(200, 200, 200);
     doc.setLineWidth(0.3);
-    doc.rect(orderDetailsXBelow, orderDetailsBoxYBelow, orderDetailsBoxWidthBelow, orderDetailsBoxHeightBelow);
+    doc.rect(billingX, addressBoxY, addressBoxWidth, addressBoxHeight);
     
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
-    doc.text('ORDER DETAILS', orderDetailsXBelow + 5, orderDetailsBoxYBelow + 8);
+    doc.text('BILLING ADDRESS', billingX + 5, addressBoxY + 8);
     
     doc.setDrawColor(200, 200, 200);
     doc.setLineWidth(0.2);
-    doc.line(orderDetailsXBelow + 2, orderDetailsBoxYBelow + 12, orderDetailsXBelow + orderDetailsBoxWidthBelow - 2, orderDetailsBoxYBelow + 12);
+    doc.line(billingX + 2, addressBoxY + 12, billingX + addressBoxWidth - 2, addressBoxY + 12);
     
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
-    let orderTextY = orderDetailsBoxYBelow + 20;
-    doc.text(`Order No: ${order.order_number}`, orderDetailsXBelow + 5, orderTextY);
-    orderTextY += 10;
-    doc.text(`Order Date: ${formattedDate}`, orderDetailsXBelow + 5, orderTextY);
-    orderTextY += 10;
-    doc.text(`Invoice No: ${invoiceNumber}`, orderDetailsXBelow + 5, orderTextY);
-    orderTextY += 10;
-    doc.text(`Invoice Date: ${formattedDate}`, orderDetailsXBelow + 5, orderTextY);
+    let billingTextY = addressBoxY + 20;
+    doc.text(billingAddress.name || order.user?.name || 'N/A', billingX + 5, billingTextY);
+    billingTextY += 10;
     
-    cursorY = orderDetailsBoxYBelow + orderDetailsBoxHeightBelow + 15;
+    const billingAddressLines = doc.splitTextToSize(billingAddress.address || order.billing_address || 'N/A', addressBoxWidth - 10);
+    billingAddressLines.forEach((line: string) => {
+      doc.text(line, billingX + 5, billingTextY);
+      billingTextY += 9;
+    });
+    
+    if (billingAddress.stateCode) {
+      doc.text(`State Code: ${billingAddress.stateCode}`, billingX + 5, billingTextY);
+    }
+    
+    cursorY = addressBoxY + addressBoxHeight + 15;
   }
-  
-  cursorY = addressBoxY + addressBoxHeight + 20;
 
   // Item Particulars Section
   if (items && items.length > 0) {
@@ -655,18 +717,75 @@ export async function generateOrderPdf(order: Order) {
     doc.setLineWidth(0.5);
     doc.rect(marginLeft, headerY, pageWidth - marginLeft - marginRight, headerHeight, 'FD');
     
-    // Draw vertical column separators in header
+    // Calculate column positions dynamically based on options
+    let colPositions = {
+      slNo: marginLeft + 5,
+      description: marginLeft + 28,
+      unitPrice: marginLeft + 161,
+      discount: marginLeft + 209,
+      qty: marginLeft + 247,
+      unit: marginLeft + 262,
+      netAmount: marginLeft + 287,
+      taxRate: marginLeft + 330,
+      totalTax: marginLeft + 402,
+      totalAmount: marginLeft + 462,
+    };
+    
+    // Adjust positions if columns are hidden
+    if (options?.hideUnitPrice) {
+      // Shift everything after unit price left
+      const shift = 45; // Width of unit price column
+      colPositions.discount -= shift;
+      colPositions.qty -= shift;
+      colPositions.unit -= shift;
+      colPositions.netAmount -= shift;
+      colPositions.taxRate -= shift;
+      colPositions.totalTax -= shift;
+      colPositions.totalAmount -= shift;
+    }
+    
+    if (options?.hideQty) {
+      // Shift everything after qty left
+      const shift = 16; // Width of qty column
+      colPositions.unit -= shift;
+      colPositions.netAmount -= shift;
+      colPositions.taxRate -= shift;
+      colPositions.totalTax -= shift;
+      colPositions.totalAmount -= shift;
+    }
+    
+    if (options?.hideUnit) {
+      // Shift everything after unit left
+      const shift = 23; // Width of unit column
+      colPositions.netAmount -= shift;
+      colPositions.taxRate -= shift;
+      colPositions.totalTax -= shift;
+      colPositions.totalAmount -= shift;
+    }
+    
+    // Draw vertical column separators in header (adjust based on options)
     doc.setDrawColor(200, 200, 200);
     doc.setLineWidth(0.2);
-    doc.line(marginLeft + 25, headerY, marginLeft + 25, headerY + headerHeight);
-    doc.line(marginLeft + 158, headerY, marginLeft + 158, headerY + headerHeight);
-    doc.line(marginLeft + 206, headerY, marginLeft + 206, headerY + headerHeight);
-    doc.line(marginLeft + 244, headerY, marginLeft + 244, headerY + headerHeight);
-    doc.line(marginLeft + 260, headerY, marginLeft + 260, headerY + headerHeight);
-    doc.line(marginLeft + 285, headerY, marginLeft + 285, headerY + headerHeight);
-    doc.line(marginLeft + 328, headerY, marginLeft + 328, headerY + headerHeight);
-    doc.line(marginLeft + 400, headerY, marginLeft + 400, headerY + headerHeight);
-    doc.line(marginLeft + 460, headerY, marginLeft + 460, headerY + headerHeight);
+    doc.line(colPositions.slNo + 20, headerY, colPositions.slNo + 20, headerY + headerHeight); // After Sl. No
+    doc.line(colPositions.description + 130, headerY, colPositions.description + 130, headerY + headerHeight); // After Description
+    
+    if (!options?.hideUnitPrice) {
+      doc.line(colPositions.unitPrice + 45, headerY, colPositions.unitPrice + 45, headerY + headerHeight); // After Unit Price
+    }
+    
+    doc.line(colPositions.discount + 35, headerY, colPositions.discount + 35, headerY + headerHeight); // After Discount
+    
+    if (!options?.hideQty) {
+      doc.line(colPositions.qty + 13, headerY, colPositions.qty + 13, headerY + headerHeight); // After Qty
+    }
+    
+    if (!options?.hideUnit) {
+      doc.line(colPositions.unit + 23, headerY, colPositions.unit + 23, headerY + headerHeight); // After Unit
+    }
+    
+    doc.line(colPositions.netAmount + 41, headerY, colPositions.netAmount + 41, headerY + headerHeight); // After Net Amount
+    doc.line(colPositions.taxRate + 70, headerY, colPositions.taxRate + 70, headerY + headerHeight); // After Tax Rate
+    doc.line(colPositions.totalTax + 60, headerY, colPositions.totalTax + 60, headerY + headerHeight); // After Total Tax
     
     // Center text vertically in header
     const headerTextY = headerY + (headerHeight / 2) + 3; // Center vertically with slight adjustment
@@ -675,18 +794,28 @@ export async function generateOrderPdf(order: Order) {
     doc.setFontSize(8);
     doc.setTextColor(0, 0, 0);
     
-    // Column positions (adjusted for new layout to match invoice format)
-    // Page width: 595pt, margins: 40pt each side, usable: 515pt
-    doc.text('Sl. No', marginLeft + 5, headerTextY);
-    doc.text('Description', marginLeft + 28, headerTextY);
-    doc.text('Unit Price', marginLeft + 161, headerTextY);
-    doc.text('Discount', marginLeft + 209, headerTextY);
-    doc.text('Qty', marginLeft + 247, headerTextY);
-    doc.text('Unit', marginLeft + 262, headerTextY);
-    doc.text('Net Amount', marginLeft + 287, headerTextY);
-    doc.text('Tax Rate', marginLeft + 330, headerTextY);
-    doc.text('Total Tax', marginLeft + 402, headerTextY);
-    doc.text('Total Amount', marginLeft + 462, headerTextY);
+    // Column headers
+    doc.text('Sl. No', colPositions.slNo, headerTextY);
+    doc.text('Description', colPositions.description, headerTextY);
+    
+    if (!options?.hideUnitPrice) {
+      doc.text('Unit Price', colPositions.unitPrice, headerTextY);
+    }
+    
+    doc.text('Discount', colPositions.discount, headerTextY);
+    
+    if (!options?.hideQty) {
+      doc.text('Qty', colPositions.qty, headerTextY);
+    }
+    
+    if (!options?.hideUnit) {
+      doc.text('Unit', colPositions.unit, headerTextY);
+    }
+    
+    doc.text('Net Amount', colPositions.netAmount, headerTextY);
+    doc.text('Tax Rate', colPositions.taxRate, headerTextY);
+    doc.text('Total Tax', colPositions.totalTax, headerTextY);
+    doc.text('Total Amount', colPositions.totalAmount, headerTextY);
     
     cursorY = headerY + headerHeight + 2; // Small gap after header
     
@@ -755,27 +884,65 @@ export async function generateOrderPdf(order: Order) {
       }
       doc.rect(marginLeft, rowStartY, pageWidth - marginLeft - marginRight, itemHeight, 'F');
       
+      // Calculate column positions for separators (same as header)
+      let colPosSep = {
+        slNo: marginLeft + 5,
+        description: marginLeft + 28,
+        unitPrice: marginLeft + 161,
+        discount: marginLeft + 209,
+        qty: marginLeft + 247,
+        unit: marginLeft + 262,
+        netAmount: marginLeft + 287,
+        taxRate: marginLeft + 330,
+        totalTax: marginLeft + 402,
+        totalAmount: marginLeft + 462,
+      };
+      
+      if (options?.hideUnitPrice) {
+        const shift = 45;
+        colPosSep.discount -= shift;
+        colPosSep.qty -= shift;
+        colPosSep.unit -= shift;
+        colPosSep.netAmount -= shift;
+        colPosSep.taxRate -= shift;
+        colPosSep.totalTax -= shift;
+        colPosSep.totalAmount -= shift;
+      }
+      
+      if (options?.hideQty) {
+        const shift = 16;
+        colPosSep.unit -= shift;
+        colPosSep.netAmount -= shift;
+        colPosSep.taxRate -= shift;
+        colPosSep.totalTax -= shift;
+        colPosSep.totalAmount -= shift;
+      }
+      
       // Draw vertical column separators
       doc.setDrawColor(200, 200, 200);
       doc.setLineWidth(0.2);
       // Sl. No separator
-      doc.line(marginLeft + 25, rowStartY, marginLeft + 25, rowStartY + itemHeight);
+      doc.line(colPosSep.slNo + 20, rowStartY, colPosSep.slNo + 20, rowStartY + itemHeight);
       // Description separator
-      doc.line(marginLeft + 158, rowStartY, marginLeft + 158, rowStartY + itemHeight);
-      // Unit Price separator
-      doc.line(marginLeft + 206, rowStartY, marginLeft + 206, rowStartY + itemHeight);
+      doc.line(colPosSep.description + 130, rowStartY, colPosSep.description + 130, rowStartY + itemHeight);
+      // Unit Price separator (only if not hidden)
+      if (!options?.hideUnitPrice) {
+        doc.line(colPosSep.unitPrice + 45, rowStartY, colPosSep.unitPrice + 45, rowStartY + itemHeight);
+      }
       // Discount separator
-      doc.line(marginLeft + 244, rowStartY, marginLeft + 244, rowStartY + itemHeight);
-      // Qty separator
-      doc.line(marginLeft + 260, rowStartY, marginLeft + 260, rowStartY + itemHeight);
+      doc.line(colPosSep.discount + 35, rowStartY, colPosSep.discount + 35, rowStartY + itemHeight);
+      // Qty separator (only if not hidden)
+      if (!options?.hideQty) {
+        doc.line(colPosSep.qty + 13, rowStartY, colPosSep.qty + 13, rowStartY + itemHeight);
+      }
       // Unit separator
-      doc.line(marginLeft + 285, rowStartY, marginLeft + 285, rowStartY + itemHeight);
+      doc.line(colPosSep.unit + 23, rowStartY, colPosSep.unit + 23, rowStartY + itemHeight);
       // Net Amount separator
-      doc.line(marginLeft + 328, rowStartY, marginLeft + 328, rowStartY + itemHeight);
+      doc.line(colPosSep.netAmount + 41, rowStartY, colPosSep.netAmount + 41, rowStartY + itemHeight);
       // Tax Rate separator
-      doc.line(marginLeft + 400, rowStartY, marginLeft + 400, rowStartY + itemHeight);
+      doc.line(colPosSep.taxRate + 70, rowStartY, colPosSep.taxRate + 70, rowStartY + itemHeight);
       // Total Tax separator
-      doc.line(marginLeft + 460, rowStartY, marginLeft + 460, rowStartY + itemHeight);
+      doc.line(colPosSep.totalTax + 60, rowStartY, colPosSep.totalTax + 60, rowStartY + itemHeight);
       
       // Calculate center Y for this row
       const rowCenterY = rowStartY + (itemHeight / 2);
@@ -785,12 +952,12 @@ export async function generateOrderPdf(order: Order) {
       doc.setTextColor(0, 0, 0);
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
-      doc.text(String(index + 1), marginLeft + 5, rowTopY + 7);
+      doc.text(String(index + 1), colPosSep.slNo, rowTopY + 7);
       
       // Description (may span multiple lines, starts from top)
       let descY = rowTopY;
       descLines.forEach((line: string, lineIndex: number) => {
-        doc.text(line, marginLeft + 28, descY);
+        doc.text(line, colPosSep.description, descY);
         if (lineIndex < descLines.length - 1) {
           descY += 11;
         }
@@ -800,26 +967,34 @@ export async function generateOrderPdf(order: Order) {
       if (hsnCode) {
         doc.setFontSize(8);
         doc.setTextColor(100, 100, 100);
-        doc.text(`HSN: ${hsnCode}`, marginLeft + 28, descY + 11);
+        doc.text(`HSN: ${hsnCode}`, colPosSep.description, descY + 11);
         doc.setTextColor(0, 0, 0);
         doc.setFontSize(9);
       }
       
-      // Unit Price (centered vertically)
-      doc.setFontSize(9);
-      doc.text(formatINR(unitPrice), marginLeft + 161, rowTopY + 7);
+      // Unit Price (centered vertically) - only if not hidden
+      if (!options?.hideUnitPrice) {
+        doc.setFontSize(9);
+        doc.text(formatINR(unitPrice), colPosSep.unitPrice, rowTopY + 7);
+      }
       
       // Discount (centered vertically)
-      doc.text(formatINR(discount), marginLeft + 209, rowTopY + 7);
+      doc.setFontSize(9);
+      doc.text(formatINR(discount), colPosSep.discount, rowTopY + 7);
       
-      // Quantity (centered vertically)
-      doc.text(String(quantity), marginLeft + 247, rowTopY + 7);
+      // Quantity (centered vertically) - only if not hidden
+      if (!options?.hideQty) {
+        doc.text(String(quantity), colPosSep.qty, rowTopY + 7);
+      }
       
-      // Unit of Measurement (centered vertically)
-      doc.text(unitOfMeasurement, marginLeft + 262, rowTopY + 7);
+      // Unit of Measurement (centered vertically) - only if not hidden
+      if (!options?.hideUnit) {
+        doc.text(unitOfMeasurement, colPosSep.unit, rowTopY + 7);
+      }
       
-      // Net Amount (centered vertically)
-      doc.text(formatINR(netAmount), marginLeft + 287, rowTopY + 7);
+      // Net Amount (centered vertically) - show price here if unit price is hidden
+      doc.setFontSize(9);
+      doc.text(formatINR(netAmount), colPosSep.netAmount, rowTopY + 7);
       
       // Tax Rate (centered vertically) - Show breakdown with amounts for CGST+SGST
       // Constrain text width to prevent overflow into Total Tax column
@@ -833,11 +1008,11 @@ export async function generateOrderPdf(order: Order) {
           const igstText = `IGST ${formatNumber(igstRate)}% ${formatINR(igstAmount)}`;
           const igstLines = doc.splitTextToSize(igstText, taxRateMaxWidth);
           igstLines.forEach((line: string, idx: number) => {
-            doc.text(line, marginLeft + 330, taxRateY);
+            doc.text(line, colPosSep.taxRate, taxRateY);
             if (idx < igstLines.length - 1) taxRateY += 9;
           });
         } else {
-          doc.text('0%', marginLeft + 330, taxRateY);
+          doc.text('0%', colPosSep.taxRate, taxRateY);
         }
       } else {
         // Intrastate: Always show CGST and SGST (even if 0 for some items in mixed orders)
@@ -846,7 +1021,7 @@ export async function generateOrderPdf(order: Order) {
           const cgstText = `CGST ${formatNumber(cgstRate)}% ${formatINR(cgstAmount)}`;
           const cgstLines = doc.splitTextToSize(cgstText, taxRateMaxWidth);
           cgstLines.forEach((line: string, idx: number) => {
-            doc.text(line, marginLeft + 330, taxRateY);
+            doc.text(line, colPosSep.taxRate, taxRateY);
             if (idx < cgstLines.length - 1) taxRateY += 9;
           });
           taxRateY += 9;
@@ -855,25 +1030,25 @@ export async function generateOrderPdf(order: Order) {
           const sgstText = `SGST ${formatNumber(sgstRate)}% ${formatINR(sgstAmount)}`;
           const sgstLines = doc.splitTextToSize(sgstText, taxRateMaxWidth);
           sgstLines.forEach((line: string, idx: number) => {
-            doc.text(line, marginLeft + 330, taxRateY);
+            doc.text(line, colPosSep.taxRate, taxRateY);
             if (idx < sgstLines.length - 1) taxRateY += 9;
           });
         }
         // If both CGST and SGST are 0 or missing, show 0%
         if ((!cgstRate || cgstRate === 0) && (!sgstRate || sgstRate === 0) && 
             (!cgstAmount || cgstAmount === 0) && (!sgstAmount || sgstAmount === 0)) {
-          doc.text('0%', marginLeft + 330, taxRateY);
+          doc.text('0%', colPosSep.taxRate, taxRateY);
         }
       }
       doc.setFontSize(9);
       
       // Total Tax (centered vertically)
-      doc.text(formatINR(taxAmount), marginLeft + 402, rowTopY + 7);
+      doc.text(formatINR(taxAmount), colPosSep.totalTax, rowTopY + 7);
       
       // Total Amount (centered vertically, bold)
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(9);
-      doc.text(formatINR(totalAmount), marginLeft + 462, rowTopY + 7);
+      doc.text(formatINR(totalAmount), colPosSep.totalAmount, rowTopY + 7);
       doc.setFont('helvetica', 'normal');
       
       // Move to next item with proper spacing
@@ -1141,8 +1316,8 @@ export async function generateOrderPdf(order: Order) {
   doc.text('Whether tax is payable under reverse charge - No', marginLeft, cursorY);
   cursorY += 20;
 
-  // Payment Transaction Details
-  if (order.payment_method) {
+  // Payment Transaction Details (hide if option is set)
+  if (!options?.hideTransactionDetails && order.payment_method) {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
     doc.text('Payment Transaction Details:', marginLeft, cursorY);
@@ -1931,4 +2106,373 @@ export async function generateReturnInvoicePdf(returnOrder: OrderReturn) {
   doc.text('Page 1 of 1', pageWidth - marginRight, pageHeight - 20, { align: 'right' });
 
   doc.save(`return_invoice_${returnOrder.return_number}.pdf`);
+}
+
+// Type for Influencer Payment Voucher
+type InfluencerPaymentVoucher = {
+  billNumber: string;
+  date: string;
+  influencerName: string;
+  purpose?: string;
+  detailedPurpose?: string;
+  amount: number;
+  referredByName?: string;
+  cashReceiverName?: string;
+  cashReceiverPhone?: string;
+};
+
+// Generate Influencer Payment Voucher PDF
+export async function generateInfluencerPaymentVoucher(voucher: InfluencerPaymentVoucher) {
+  const doc = new jsPDF('portrait', 'pt', 'a4');
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const marginLeft = 40;
+  const marginRight = 40;
+  const marginTop = 40;
+  let cursorY = marginTop;
+
+  // Helper function to format amount (no currency symbol)
+  const formatAmount = (amount: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(Number(amount || 0));
+  };
+
+  // Company Information
+  const companyInfo = {
+    name: 'ONLY2U FASHION PRIVATE LIMITED',
+    address: 'Flot No:1, 9-1-87, Ground Floor, Meghna Manor Apartments, Old Lancer Road, Secunderabad-500025.',
+    gstin: '36AAECO9300L1Z9',
+  };
+
+  // White background (no tint)
+  doc.setFillColor(255, 255, 255);
+  doc.rect(0, 0, pageWidth, pageHeight, 'F');
+
+  // Company Name (Large, Blue, Serif-like font)
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(24);
+  doc.setTextColor(0, 51, 153); // Blue color
+  const companyNameWidth = doc.getTextWidth(companyInfo.name);
+  doc.text(companyInfo.name, (pageWidth - companyNameWidth) / 2, cursorY);
+  cursorY += 25;
+
+  // Main Address (Smaller, Blue, Sans-serif)
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.setTextColor(0, 51, 153);
+  const addressLines = doc.splitTextToSize(companyInfo.address, pageWidth - marginLeft - marginRight);
+  addressLines.forEach((line: string) => {
+    const lineWidth = doc.getTextWidth(line);
+    doc.text(line, (pageWidth - lineWidth) / 2, cursorY);
+    cursorY += 14;
+  });
+  cursorY += 10;
+
+  // GST Number
+  doc.setFontSize(10);
+  doc.setTextColor(0, 51, 153);
+  const gstText = `GST NO : ${companyInfo.gstin}`;
+  const gstWidth = doc.getTextWidth(gstText);
+  doc.text(gstText, (pageWidth - gstWidth) / 2, cursorY);
+  cursorY += 40;
+
+  // Transaction Details Section
+  doc.setTextColor(0, 0, 0); // Black for form fields
+  doc.setDrawColor(0, 51, 153); // Blue lines
+  doc.setLineWidth(0.5);
+
+  // Bill No. and Date (on same line)
+  cursorY += 20;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('Bill No.', marginLeft, cursorY);
+  
+  
+  // Bill Number value with line extending from it
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  const billNoX = marginLeft + 75;
+  const billNoLineEndX = billNoX + 120;
+  doc.text(voucher.billNumber, billNoX, cursorY);
+  doc.line(billNoX + doc.getTextWidth(voucher.billNumber) + 5, cursorY - 4, billNoLineEndX, cursorY - 4);
+  
+  // Date on the right
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  const dateLabelX = pageWidth - marginRight - 200;
+  doc.text('Date.', dateLabelX, cursorY);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  const dateValueX = dateLabelX + 45;
+  doc.text(voucher.date, dateValueX, cursorY);
+  doc.line(dateValueX + doc.getTextWidth(voucher.date) + 5, cursorY - 4, pageWidth - marginRight - 20, cursorY - 4);
+  
+  cursorY += 35;
+
+  // CASH PAID TO
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('CASH PAID TO', marginLeft, cursorY);
+  
+  // Cash Paid To value with line
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  const cashPaidToX = marginLeft + 100;
+  const cashPaidToLineEndX = pageWidth - marginRight - 20;
+  doc.text(voucher.influencerName, cashPaidToX, cursorY);
+  doc.line(cashPaidToX + doc.getTextWidth(voucher.influencerName) + 5, cursorY - 4, cashPaidToLineEndX, cursorY - 4);
+  
+  cursorY += 35;
+
+  // THE PURPOSE OF
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('THE PURPOSE OF', marginLeft, cursorY);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  const purposeStartX = marginLeft + 110;
+  const purposeLineEndX = pageWidth - marginRight - 20;
+  
+  if (voucher.detailedPurpose) {
+    const purposeLines = doc.splitTextToSize(voucher.detailedPurpose, purposeLineEndX - purposeStartX - 10);
+    purposeLines.forEach((line: string, idx: number) => {
+      doc.text(line, purposeStartX, cursorY + (idx * 15));
+    });
+    // Draw line extending from the last line
+    const lastLineY = cursorY + (purposeLines.length - 1) * 15;
+    doc.line(purposeStartX + doc.getTextWidth(purposeLines[purposeLines.length - 1]) + 5, lastLineY - 4, purposeLineEndX, lastLineY - 4);
+    cursorY += purposeLines.length * 15;
+  } else {
+    doc.line(purposeStartX, cursorY - 4, purposeLineEndX, cursorY - 4);
+    cursorY += 15;
+  }
+  
+  cursorY += 25;
+
+  // RUPEES IN WORDS
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('RUPEES IN WORDS', marginLeft, cursorY);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  const wordsStartX = marginLeft + 130;
+  const wordsLineEndX = pageWidth - marginRight - 20;
+  const amountWords = formatAmountInWords(voucher.amount);
+  const wordsLines = doc.splitTextToSize(amountWords, wordsLineEndX - wordsStartX - 10);
+  wordsLines.forEach((line: string, idx: number) => {
+    doc.text(line, wordsStartX, cursorY + (idx * 15));
+  });
+  // Draw line extending from the last line
+  const lastWordsLineY = cursorY + (wordsLines.length - 1) * 15;
+  doc.line(wordsStartX + doc.getTextWidth(wordsLines[wordsLines.length - 1]) + 5, lastWordsLineY - 4, wordsLineEndX, lastWordsLineY - 4);
+  cursorY += wordsLines.length * 15 + 40;
+
+  // Amount Box (Bottom Right) - positioned above signature lines
+  const amountBoxWidth = 140;
+  const amountBoxHeight = 50;
+  const amountBoxX = pageWidth - marginRight - amountBoxWidth;
+  const amountBoxY = pageHeight - marginRight - amountBoxHeight - 80;
+
+  doc.setDrawColor(0, 51, 153);
+  doc.setLineWidth(1);
+  doc.rect(amountBoxX, amountBoxY, amountBoxWidth, amountBoxHeight);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.setTextColor(0, 0, 0);
+  const amountText = formatAmount(voucher.amount);
+  const amountTextWidth = doc.getTextWidth(amountText);
+  doc.text(amountText, amountBoxX + (amountBoxWidth - amountTextWidth) / 2, amountBoxY + 32);
+
+  // Signature Lines (Bottom)
+  const signatureY = pageHeight - marginRight - 50;
+  const signatureLineLength = 130;
+  const signatureSpacing = (pageWidth - marginLeft - marginRight - (signatureLineLength * 3)) / 2;
+
+  // Cash Payee Sign (Left)
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(0, 0, 0);
+  doc.setDrawColor(0, 51, 153);
+  doc.setLineWidth(0.5);
+  doc.line(marginLeft, signatureY - 15, marginLeft + signatureLineLength, signatureY - 15);
+  doc.text('Cash Payee Sign', marginLeft, signatureY);
+
+  // Refered Name / Sign (Center)
+  const centerX = marginLeft + signatureLineLength + signatureSpacing;
+  doc.line(centerX, signatureY - 15, centerX + signatureLineLength, signatureY - 15);
+  doc.text('Refered Name / Sign', centerX, signatureY);
+  if (voucher.referredByName) {
+    doc.setFontSize(8);
+    doc.text(voucher.referredByName, centerX, signatureY - 18);
+    doc.setFontSize(9);
+  }
+
+  // Cash Receiver Sign. and Phone Number (Right)
+  const rightX = centerX + signatureLineLength + signatureSpacing;
+  doc.line(rightX, signatureY - 15, rightX + signatureLineLength, signatureY - 15);
+  doc.text('Cash Receiver Sign. and Phone Number', rightX, signatureY);
+  if (voucher.cashReceiverName) {
+    doc.setFontSize(8);
+    doc.text(voucher.cashReceiverName, rightX, signatureY - 18);
+    if (voucher.cashReceiverPhone) {
+      doc.text(voucher.cashReceiverPhone, rightX, signatureY - 28);
+    }
+    doc.setFontSize(9);
+  }
+
+  // Save PDF
+  doc.save(`influencer_payment_voucher_${voucher.billNumber}.pdf`);
+}
+
+// Type for Vendor Commission Invoice
+type VendorCommissionInvoice = {
+  invoiceNumber: string;
+  date: string;
+  vendorName: string;
+  vendorAddress?: string;
+  vendorGSTIN?: string;
+  vendorPAN?: string;
+  commissionRate: number;
+  totalSalesAmount: number;
+  commissionAmount: number;
+  period?: string; // e.g., "January 2025"
+  purpose?: string;
+  detailedPurpose?: string;
+  referredByName?: string;
+  cashReceiverName?: string;
+  cashReceiverPhone?: string;
+};
+
+// Generate Vendor Commission Invoice PDF (Tax Invoice Format)
+export async function generateVendorCommissionInvoice(invoice: VendorCommissionInvoice) {
+  // Parse vendor address to determine state and tax calculation
+  const vendorAddressParsed = parseAddress(invoice.vendorAddress || '');
+  
+  // Determine supply type (InterState or IntraState)
+  // Seller state code is '36' (Telangana) from GSTIN 36AAECO9300L1Z9
+  const sellerStateCode = '36';
+  const buyerStateCode = vendorAddressParsed.stateCode || '';
+  
+  // If buyer state code is not available, try to extract from state name
+  let finalBuyerStateCode = buyerStateCode;
+  if (!finalBuyerStateCode && vendorAddressParsed.state) {
+    const stateNameToCode: { [key: string]: string } = {
+      'TELANGANA': '36',
+      'ANDHRA PRADESH': '37',
+      'TAMIL NADU': '33',
+      'KARNATAKA': '29',
+      'KERALA': '32',
+      'MAHARASHTRA': '27',
+      'GUJARAT': '24',
+      'RAJASTHAN': '08',
+      'PUNJAB': '03',
+      'HARYANA': '06',
+      'UTTAR PRADESH': '09',
+      'WEST BENGAL': '19',
+      'BIHAR': '10',
+      'ODISHA': '21',
+      'MADHYA PRADESH': '23',
+      'JHARKHAND': '20',
+      'ASSAM': '18',
+      'CHHATTISGARH': '22',
+      'HIMACHAL PRADESH': '02',
+      'UTTARAKHAND': '05',
+      'GOA': '30',
+      'DELHI': '07',
+    };
+    const stateUpper = vendorAddressParsed.state.toUpperCase();
+    finalBuyerStateCode = stateNameToCode[stateUpper] || '';
+  }
+  
+  // Determine if interstate: different states = interstate, same state = intrastate
+  const isInterState = finalBuyerStateCode !== '' && sellerStateCode !== finalBuyerStateCode;
+  
+  // Calculate tax for commission amount
+  const calculateTaxForItem = (unitPrice: number, isInterState: boolean) => {
+    const PRICE_THRESHOLD = 2500;
+    
+    if (unitPrice <= PRICE_THRESHOLD) {
+      if (isInterState) {
+        return { igstRate: 5, cgstRate: 0, sgstRate: 0 };
+      } else {
+        return { igstRate: 0, cgstRate: 2.5, sgstRate: 2.5 };
+      }
+    } else {
+      if (isInterState) {
+        return { igstRate: 18, cgstRate: 0, sgstRate: 0 };
+      } else {
+        return { igstRate: 0, cgstRate: 9, sgstRate: 9 };
+      }
+    }
+  };
+
+  // Calculate tax for commission
+  const taxRates = calculateTaxForItem(invoice.commissionAmount, isInterState);
+  const netAmount = invoice.commissionAmount;
+  const cgstAmount = (netAmount * taxRates.cgstRate) / 100;
+  const sgstAmount = (netAmount * taxRates.sgstRate) / 100;
+  const igstAmount = (netAmount * taxRates.igstRate) / 100;
+  const totalTaxAmount = cgstAmount + sgstAmount + igstAmount;
+  const invoiceTotal = netAmount + totalTaxAmount;
+
+  // Create a mock order structure to reuse the tax invoice generation logic
+  const mockOrder: Order = {
+    id: invoice.invoiceNumber,
+    user_id: 'vendor',
+    order_number: invoice.invoiceNumber,
+    status: 'completed',
+    total_amount: invoiceTotal,
+    shipping_address: invoice.vendorAddress || '',
+    billing_address: invoice.vendorAddress || '',
+    payment_method: 'Commission',
+    payment_status: 'pending',
+    notes: invoice.detailedPurpose || `Commission @ ${invoice.commissionRate}% on sales of ${invoice.totalSalesAmount}`,
+    created_at: invoice.date,
+    order_items: [{
+      id: '1',
+      order_id: invoice.invoiceNumber,
+      product_id: 'COMMISSION',
+      product_name: `Commission @ ${invoice.commissionRate}% on Sales`,
+      product_sku: 'COMM-' + invoice.invoiceNumber,
+      quantity: 1,
+      unit_price: netAmount,
+      total_price: netAmount,
+      hsn_code: '998314', // HSN code for commission/fee for services
+      unit_of_measurement: 'NOS',
+      cgst_rate: taxRates.cgstRate,
+      sgst_rate: taxRates.sgstRate,
+      igst_rate: taxRates.igstRate,
+      cgst_amount: cgstAmount,
+      sgst_amount: sgstAmount,
+      igst_amount: igstAmount,
+      net_amount: netAmount,
+      tax_amount: totalTaxAmount,
+      item_total: invoiceTotal,
+    }],
+    user: {
+      name: invoice.vendorName,
+      email: '',
+      phone: '',
+    },
+  };
+
+  // Call generateOrderPdf with Only2U as seller and custom options for commission invoice
+  await generateOrderPdf(mockOrder, {
+    name: 'ONLY2U FASHION PRIVATE LIMITED',
+    address: 'Flot No:1, 9-1-87, Ground Floor, Meghna Manor Apartments, Old Lancer Road, Secunderabad-500025.',
+    pan: 'AAECO9300L',
+    gstin: '36AAECO9300L1Z9',
+  }, {
+    useBilledBy: true, // Use "BILLED BY" instead of "SOLD BY"
+    useBilledTo: true, // Use "BILLED TO" instead of billing/shipping address
+    hideShippingAddress: true, // Hide shipping address section
+    hideOrderDetails: true, // Hide order details section
+    hideUnitPrice: true, // Hide unit price column, only show price
+    hideQty: true, // Hide quantity column
+    hideUnit: true, // Hide unit of measurement column
+    hideTransactionDetails: true, // Hide transaction details section
+  });
 }

@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { supabase } from "../../../lib/supabase";
 import { uploadFile } from "../../../lib/uploadUtils";
 import { exportVendors } from "./vendorExportUtils";
+import { generateVendorCommissionInvoice } from "../../../lib/pdfUtils";
 
 interface Vendor {
   id: string;
@@ -219,6 +220,39 @@ const VendorManagement = () => {
     }
   };
 
+  const generateSampleCommissionInvoice = async () => {
+    try {
+      const sampleInvoice = {
+        invoiceNumber: `VCI-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`,
+        date: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+        vendorName: 'Shubhamastu Shopping Mall Private Limited',
+        vendorAddress: '17/397, VRC centre, Nellore, Andhra Pradesh, IN',
+        vendorGSTIN: '37ABFCS0076F1ZE',
+        vendorPAN: 'ABFCSO076F',
+        commissionRate: 10,
+        totalSalesAmount: 100000.00,
+        commissionAmount: 10000.00, // 10% of 100000
+        period: 'January 2025',
+        purpose: 'Vendor Commission Payment',
+        detailedPurpose: 'Commission payment of 10% on total sales of ₹1,00,000.00 for the period January 2025',
+        referredByName: '',
+        cashReceiverName: 'Shubhamastu Shopping Mall Private Limited',
+        cashReceiverPhone: '',
+      };
+
+      await generateVendorCommissionInvoice(sampleInvoice);
+      
+      if (typeof window !== "undefined") {
+        window.alert("Sample vendor commission invoice generated successfully!");
+      }
+    } catch (error: any) {
+      console.error("Error generating sample commission invoice:", error);
+      if (typeof window !== "undefined") {
+        window.alert(`Error generating invoice: ${error.message || 'Unknown error'}`);
+      }
+    }
+  };
+
   const filteredVendors = vendors.filter((vendor) => {
     const matchesSearch =
       vendor.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -237,6 +271,13 @@ const VendorManagement = () => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Vendor Management</h1>
         <div className="flex items-center gap-3">
+          <button
+            onClick={generateSampleCommissionInvoice}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            title="Generate Sample Commission Invoice"
+          >
+            Generate Sample Commission Invoice
+          </button>
           <button
             onClick={async () => {
               if (filteredVendors.length === 0) {

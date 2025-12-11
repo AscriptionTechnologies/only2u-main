@@ -992,15 +992,15 @@ export default function CategoryManagement() {
               {categories.map((cat) => {
                 const stats = categoryStats.find(s => s.categoryId === cat.id);
                 return (
-                  <SortableCategoryCard
-                    key={cat.id}
-                    category={cat}
+                <SortableCategoryCard
+                  key={cat.id}
+                  category={cat}
                     stats={stats}
-                    onCategoryClick={handleCategoryClick}
-                    onToggleStatus={toggleCategoryStatus}
-                    onEdit={handleEditCategory}
-                    onDelete={handleDeleteCategory}
-                  />
+                  onCategoryClick={handleCategoryClick}
+                  onToggleStatus={toggleCategoryStatus}
+                  onEdit={handleEditCategory}
+                  onDelete={handleDeleteCategory}
+                />
                 );
               })}
             </SortableContext>
@@ -1491,15 +1491,15 @@ function SortableCategoryCard({
         )}
         <div className="flex-1">
           <div className="flex items-start justify-between gap-4 mb-2">
-            <div className="flex-1">
-              <h3 className="text-lg font-semibold text-gray-800">
-                {category.name}
-              </h3>
+        <div className="flex-1">
+          <h3 className="text-lg font-semibold text-gray-800">
+            {category.name}
+          </h3>
               <p className="text-sm text-gray-600 mt-1">{category.description}</p>
             </div>
             <span className={`inline-block px-3 py-1 text-xs rounded-full font-semibold whitespace-nowrap ${category.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-              {category.is_active ? 'Active' : 'Inactive'}
-            </span>
+            {category.is_active ? 'Active' : 'Inactive'}
+          </span>
           </div>
           {stats && (
             <div className="mt-3 space-y-2">

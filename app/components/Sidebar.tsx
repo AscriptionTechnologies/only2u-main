@@ -20,7 +20,8 @@ import {
   Ticket,
   Star,
   FileText,
-  BarChart3
+  BarChart3,
+  Archive
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import Logo from "./Logo";
@@ -49,6 +50,12 @@ const Sidebar = () => {
       icon: Contact,
       link: "/admin/CategoryManagement",
       path: "CategoryManagement",
+    },
+    {
+      name: "ZIP Product Import",
+      icon: Archive,
+      link: "/admin/ZipImport",
+      path: "ZipImport",
     },
     {
       name: "Fabric Management",

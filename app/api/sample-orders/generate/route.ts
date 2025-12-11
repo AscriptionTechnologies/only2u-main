@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { user_id } = body;
-
+    
     if (!user_id) {
       return NextResponse.json(
         { error: 'Missing required field: user_id' },
@@ -32,8 +32,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const today = new Date();
-    const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
+        const today = new Date();
+        const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
     const createdOrders: any[] = [];
 
     // Sample Order 1: IGST - Below ₹2500 (InterState)
@@ -199,33 +199,33 @@ async function createSampleOrder(
     dummyProductId = newProduct.id;
   }
 
-  // Calculate total amount
+        // Calculate total amount
   const total_amount = items.reduce((sum, item) => sum + (item.price * item.qty), 0);
 
-  // Create order
-  const { data: order, error: orderError } = await supabase
-    .from('orders')
-    .insert({
-      user_id,
+        // Create order
+        const { data: order, error: orderError } = await supabase
+          .from('orders')
+          .insert({
+            user_id,
       order_number,
-      total_amount,
+            total_amount,
       shipping_address,
       billing_address,
       payment_method: 'Online',
-      payment_status: 'paid',
-      status: 'completed',
+            payment_status: 'paid',
+            status: 'completed',
       notes: 'Sample order for tax testing',
-    })
-    .select()
-    .single();
+          })
+          .select()
+          .single();
 
-  if (orderError) {
+        if (orderError) {
     throw new Error(`Failed to create order: ${orderError.message}`);
-  }
+        }
 
-  // Create order items
+        // Create order items
   const orderItems = items.map((item, index) => ({
-    order_id: order.id,
+          order_id: order.id,
     product_id: dummyProductId, // Use valid product ID
     product_name: item.name,
     product_sku: item.sku,
@@ -236,17 +236,17 @@ async function createSampleOrder(
     unit_price: item.price,
     total_price: item.price * item.qty,
     hsn_code: item.hsn, // Include HSN code from items array
-  }));
+        }));
 
   const { error: itemsError } = await supabase
-    .from('order_items')
+          .from('order_items')
     .insert(orderItems);
 
-  if (itemsError) {
+        if (itemsError) {
     // Clean up order if items insertion fails
     await supabase.from('orders').delete().eq('id', order.id);
     throw new Error(`Failed to create order items: ${itemsError.message}`);
   }
 
   return order;
-}
+  }
