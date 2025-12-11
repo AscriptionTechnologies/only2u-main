@@ -239,18 +239,26 @@ export default function InfluencerProfilesPage() {
       contact_phone: formState.contact_phone.trim() || null,
       website_url: formState.website_url.trim() || null,
       total_followers: parseInt(formState.total_followers) || 0,
+      total_posts: 0,
+      total_products_promoted: 0,
       influencer_code: formState.influencer_code.trim() || null,
       commission_rate: parseFloat(formState.commission_rate) || 10.0,
+      total_earnings: 0.00,
       is_verified: formState.is_verified,
       is_active: formState.is_active,
+      allow_messages: true,
+      show_contact_info: false,
       profile_photo: profilePhotoUrl || null,
+      joined_at: new Date().toISOString(),
     };
 
     try {
       if (editingProfile) {
+        // Remove fields that shouldn't be updated on edit
+        const { joined_at, total_posts, total_products_promoted, total_earnings, ...updatePayload } = payload;
         const { error: updateError } = await supabase
           .from("influencer_profiles")
-          .update(payload)
+          .update(updatePayload)
           .eq("id", editingProfile.id);
 
         if (updateError) {
@@ -267,15 +275,29 @@ export default function InfluencerProfilesPage() {
 
         if (insertError) {
           console.error("Error creating profile:", insertError);
-          setError(insertError.message || "Failed to create profile.");
+          // Provide more detailed error message
+          let errorMessage = "Failed to create profile.";
+          if (insertError.code === '23505') {
+            // Unique constraint violation
+            if (insertError.message.includes('username')) {
+              errorMessage = "Username already exists. Please choose a different username.";
+            } else if (insertError.message.includes('influencer_code')) {
+              errorMessage = "Influencer code already exists. Please choose a different code.";
+            } else {
+              errorMessage = "A profile with this information already exists.";
+            }
+          } else {
+            errorMessage = insertError.message || errorMessage;
+          }
+          setError(errorMessage);
         } else {
           resetForm();
           fetchProfiles();
         }
       }
-    } catch (submitError) {
+    } catch (submitError: any) {
       console.error("Unexpected error:", submitError);
-      setError("Something went wrong. Please try again.");
+      setError(submitError?.message || "Something went wrong. Please try again.");
     } finally {
       setSubmitting(false);
     }
