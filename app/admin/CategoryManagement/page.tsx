@@ -66,7 +66,7 @@ const getProductCategoryName = (product: Product): string => {
 // Function to get size order for sorting (standard clothing size order)
 const getSizeOrder = (sizeName: string): number => {
   const normalizedSize = sizeName.toUpperCase().trim();
-  
+
   // Handle common size variations
   const sizeOrder: { [key: string]: number } = {
     'XXS': 1,
@@ -87,12 +87,12 @@ const getSizeOrder = (sizeName: string): number => {
     '7XL': 12,
     '8XL': 13,
   };
-  
+
   // Check exact match first
   if (sizeOrder[normalizedSize] !== undefined) {
     return sizeOrder[normalizedSize];
   }
-  
+
   // Handle patterns like "2XL", "3XL", etc. (numeric prefix)
   const numericXlMatch = normalizedSize.match(/^(\d+)XL$/);
   if (numericXlMatch) {
@@ -102,7 +102,7 @@ const getSizeOrder = (sizeName: string): number => {
     if (num === 3) return 8; // 3XL = XXXL
     if (num >= 4) return 8 + (num - 3); // 4XL, 5XL, etc.
   }
-  
+
   // Handle patterns like "XXL", "XXXL", etc. (multiple X's)
   if (normalizedSize.match(/^X+L$/)) {
     const xCount = normalizedSize.match(/X/g)?.length || 0;
@@ -111,7 +111,7 @@ const getSizeOrder = (sizeName: string): number => {
     if (xCount === 3) return 8; // XXXL
     if (xCount >= 4) return 8 + (xCount - 3); // XXXXL, etc.
   }
-  
+
   // Check if it starts with a known size (but be careful with partial matches)
   // Only check if it's a complete word match or starts with the key followed by non-letter
   for (const [key, value] of Object.entries(sizeOrder)) {
@@ -121,7 +121,7 @@ const getSizeOrder = (sizeName: string): number => {
       return value;
     }
   }
-  
+
   // For numeric sizes (like "28", "30", etc.), try to parse and assign high order
   const numericMatch = normalizedSize.match(/^(\d+)$/);
   if (numericMatch) {
@@ -129,7 +129,7 @@ const getSizeOrder = (sizeName: string): number => {
     // Assume numeric sizes come after standard sizes
     return 100 + num;
   }
-  
+
   // Unknown sizes go to the end
   return 1000;
 };
@@ -162,7 +162,7 @@ export default function CategoryManagement() {
   const [exporting, setExporting] = useState(false);
   const [exportingSku, setExportingSku] = useState(false);
   const [showSkuExportMenu, setShowSkuExportMenu] = useState(false);
-  
+
   // Featured products view state
   const [viewMode, setViewMode] = useState<'categories' | 'featured' | 'section-order'>('categories');
   const [featureFilter, setFeatureFilter] = useState<'all' | 'trending' | 'best_seller'>('all');
@@ -207,20 +207,20 @@ export default function CategoryManagement() {
   const fetchCategoryStats = async () => {
     try {
       const stats: CategoryStats[] = [];
-      
+
       for (const category of categories) {
         // Get total product count for this category
         const { count: productCount } = await supabase
           .from('products')
           .select('*', { count: 'exact', head: true })
           .eq('category_id', category.id);
-        
+
         // Get all products in this category
         const { data: productsData } = await supabase
           .from('products')
           .select('id')
           .eq('category_id', category.id);
-        
+
         if (!productsData || productsData.length === 0) {
           stats.push({
             categoryId: category.id,
@@ -229,9 +229,9 @@ export default function CategoryManagement() {
           });
           continue;
         }
-        
+
         const productIds = productsData.map(p => p.id);
-        
+
         // Get all variants for products in this category with size information
         const { data: variantsData, error: variantsError } = await supabase
           .from('product_variants')
@@ -241,7 +241,7 @@ export default function CategoryManagement() {
             size:sizes(name)
           `)
           .in('product_id', productIds);
-        
+
         if (variantsError) {
           console.error(`Error fetching variants for category ${category.id}:`, variantsError);
           stats.push({
@@ -251,7 +251,7 @@ export default function CategoryManagement() {
           });
           continue;
         }
-        
+
         // Count variants by size
         const sizeCountMap: { [key: string]: number } = {};
         if (variantsData) {
@@ -260,7 +260,7 @@ export default function CategoryManagement() {
             sizeCountMap[sizeName] = (sizeCountMap[sizeName] || 0) + 1;
           });
         }
-        
+
         const sizeCounts = Object.entries(sizeCountMap)
           .map(([sizeName, count]) => ({ sizeName, count }))
           .sort((a, b) => {
@@ -272,14 +272,14 @@ export default function CategoryManagement() {
             }
             return orderA - orderB;
           });
-        
+
         stats.push({
           categoryId: category.id,
           totalProducts: productCount || 0,
           sizeCounts,
         });
       }
-      
+
       setCategoryStats(stats);
     } catch (error) {
       console.error('Error fetching category stats:', error);
@@ -592,12 +592,17 @@ export default function CategoryManagement() {
           const categoryName = Array.isArray(product?.category)
             ? product?.category[0]?.name || 'N/A'
             : (product?.category as any)?.name || 'N/A';
-          
+
+          const sizeData = variant.size as any;
+          const sizeName = Array.isArray(sizeData)
+            ? sizeData[0]?.name
+            : sizeData?.name || 'N/A';
+
           return {
             sku: variant.sku,
             productName: product?.name || 'N/A',
             categoryName: categoryName,
-            sizeName: variant.size?.name || 'N/A',
+            sizeName: sizeName || 'N/A',
             productId: variant.product_id,
             variantId: variant.id,
           };
@@ -614,9 +619,9 @@ export default function CategoryManagement() {
     try {
       setExportingSku(true);
       setShowSkuExportMenu(false);
-      
+
       const skuList = await fetchAllSkus();
-      
+
       if (skuList.length === 0) {
         alert('No SKUs found to export.');
         return;
@@ -624,7 +629,7 @@ export default function CategoryManagement() {
 
       // Create TXT content - one SKU per line
       const txtContent = skuList.map(item => item.sku).join('\n');
-      
+
       // Create blob and download
       const blob = new Blob([txtContent], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
@@ -647,9 +652,9 @@ export default function CategoryManagement() {
     try {
       setExportingSku(true);
       setShowSkuExportMenu(false);
-      
+
       const skuList = await fetchAllSkus();
-      
+
       if (skuList.length === 0) {
         alert('No SKUs found to export.');
         return;
@@ -677,7 +682,7 @@ export default function CategoryManagement() {
       ];
 
       const csvContent = csvRows.join('\n');
-      
+
       // Create blob and download
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
@@ -702,8 +707,8 @@ export default function CategoryManagement() {
       currentView === 'categories'
         ? categories
         : currentView === 'section-order'
-        ? featureSections
-        : products;
+          ? featureSections
+          : products;
 
     if (dataset.length === 0) {
       alert('There is no data to export for this view yet.');
@@ -856,13 +861,13 @@ export default function CategoryManagement() {
           console.error('Failed to update category order');
           // Revert the order if the API call fails
           await fetchCategories();
-      // Stats will be refreshed automatically via useEffect when categories change
+          // Stats will be refreshed automatically via useEffect when categories change
         }
       } catch (error) {
         console.error('Error updating category order:', error);
         // Revert the order if the API call fails
         await fetchCategories();
-      // Stats will be refreshed automatically via useEffect when categories change
+        // Stats will be refreshed automatically via useEffect when categories change
       }
     }
   };
@@ -905,15 +910,15 @@ export default function CategoryManagement() {
     viewMode === 'categories'
       ? 'Export Categories'
       : viewMode === 'section-order'
-      ? 'Export Sections'
-      : 'Export Featured Products';
+        ? 'Export Sections'
+        : 'Export Featured Products';
 
   const currentDatasetCount =
     viewMode === 'categories'
       ? categories.length
       : viewMode === 'section-order'
-      ? featureSections.length
-      : products.length;
+        ? featureSections.length
+        : products.length;
 
   // Drag and Drop handlers for featured products
   const handleProductDragEnd = async (event: DragEndEvent) => {
@@ -958,17 +963,16 @@ export default function CategoryManagement() {
 
   return (
     <div className="p-6">
-  <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Inventory Management</h1>
         <div className="flex items-center gap-2">
           <button
             onClick={handleExport}
             disabled={exporting || currentDatasetCount === 0}
-            className={`flex items-center gap-2 py-2 px-4 rounded-lg border transition-colors ${
-              exporting || currentDatasetCount === 0
+            className={`flex items-center gap-2 py-2 px-4 rounded-lg border transition-colors ${exporting || currentDatasetCount === 0
                 ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
                 : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300'
-            }`}
+              }`}
           >
             {exporting ? (
               <svg className="h-4 w-4 animate-spin text-[#F53F7A]" viewBox="0 0 24 24">
@@ -982,17 +986,16 @@ export default function CategoryManagement() {
             )}
             {exporting ? 'Preparing...' : exportLabel}
           </button>
-          
+
           {/* Export SKU Button with Dropdown */}
           <div className="relative">
             <button
               onClick={() => setShowSkuExportMenu(!showSkuExportMenu)}
               disabled={exportingSku}
-              className={`flex items-center gap-2 py-2 px-4 rounded-lg border transition-colors ${
-                exportingSku
+              className={`flex items-center gap-2 py-2 px-4 rounded-lg border transition-colors ${exportingSku
                   ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
                   : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300'
-              }`}
+                }`}
             >
               {exportingSku ? (
                 <svg className="h-4 w-4 animate-spin text-[#F53F7A]" viewBox="0 0 24 24">
@@ -1009,11 +1012,11 @@ export default function CategoryManagement() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </button>
-            
+
             {showSkuExportMenu && (
               <>
-                <div 
-                  className="fixed inset-0 z-10" 
+                <div
+                  className="fixed inset-0 z-10"
                   onClick={() => setShowSkuExportMenu(false)}
                 ></div>
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
@@ -1060,11 +1063,10 @@ export default function CategoryManagement() {
           <nav className="-mb-px flex space-x-8">
             <button
               onClick={() => setViewMode('categories')}
-              className={`${
-                viewMode === 'categories'
+              className={`${viewMode === 'categories'
                   ? 'border-[#F53F7A] text-[#F53F7A]'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-2`}
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-2`}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
@@ -1078,11 +1080,10 @@ export default function CategoryManagement() {
             </button>
             <button
               onClick={() => setViewMode('section-order')}
-              className={`${
-                viewMode === 'section-order'
+              className={`${viewMode === 'section-order'
                   ? 'border-[#F53F7A] text-[#F53F7A]'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-2`}
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-2`}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
@@ -1091,11 +1092,10 @@ export default function CategoryManagement() {
             </button>
             <button
               onClick={() => setViewMode('featured')}
-              className={`${
-                viewMode === 'featured'
+              className={`${viewMode === 'featured'
                   ? 'border-[#F53F7A] text-[#F53F7A]'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-2`}
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-2`}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
@@ -1118,13 +1118,13 @@ export default function CategoryManagement() {
               <div className="flex-1">
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">Mobile App Home Screen Order</h3>
                 <p className="text-sm text-gray-700 mb-3">
-                  Drag and drop the sections below to control the order they appear on the mobile app home screen. 
+                  Drag and drop the sections below to control the order they appear on the mobile app home screen.
                   The first section will appear at the top, followed by the others in order.
                 </p>
                 <div className="bg-white rounded-lg p-3 border border-purple-200">
                   <p className="text-xs font-semibold text-purple-900 mb-1">Current Order Preview:</p>
                   <p className="text-xs text-gray-600">
-                    {featureSections.filter(s => s.is_active).map((s, i) => 
+                    {featureSections.filter(s => s.is_active).map((s, i) =>
                       `${i + 1}. ${s.title}`
                     ).join(' → ')}
                   </p>
@@ -1140,7 +1140,7 @@ export default function CategoryManagement() {
               </svg>
               Drag to Reorder Home Screen Sections
             </h3>
-            
+
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
@@ -1175,37 +1175,37 @@ export default function CategoryManagement() {
       {/* Categories View */}
       {viewMode === 'categories' && (
         <div className="bg-white space-y-3 overflow-hidden">
-        {loading ? (
-          <div className="text-center py-10 text-gray-400">Loading...</div>
-        ) : categories.length === 0 ? (
-          <div className="text-center py-10 text-gray-400">No categories found.</div>
-        ) : (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={categories.map(cat => cat.id)}
-              strategy={verticalListSortingStrategy}
+          {loading ? (
+            <div className="text-center py-10 text-gray-400">Loading...</div>
+          ) : categories.length === 0 ? (
+            <div className="text-center py-10 text-gray-400">No categories found.</div>
+          ) : (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
             >
-              {categories.map((cat) => {
-                const stats = categoryStats.find(s => s.categoryId === cat.id);
-                return (
-                <SortableCategoryCard
-                  key={cat.id}
-                  category={cat}
-                    stats={stats}
-                  onCategoryClick={handleCategoryClick}
-                  onToggleStatus={toggleCategoryStatus}
-                  onEdit={handleEditCategory}
-                  onDelete={handleDeleteCategory}
-                />
-                );
-              })}
-            </SortableContext>
-          </DndContext>
-        )}
+              <SortableContext
+                items={categories.map(cat => cat.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                {categories.map((cat) => {
+                  const stats = categoryStats.find(s => s.categoryId === cat.id);
+                  return (
+                    <SortableCategoryCard
+                      key={cat.id}
+                      category={cat}
+                      stats={stats}
+                      onCategoryClick={handleCategoryClick}
+                      onToggleStatus={toggleCategoryStatus}
+                      onEdit={handleEditCategory}
+                      onDelete={handleDeleteCategory}
+                    />
+                  );
+                })}
+              </SortableContext>
+            </DndContext>
+          )}
         </div>
       )}
 
@@ -1217,21 +1217,19 @@ export default function CategoryManagement() {
             <div className="flex gap-3">
               <button
                 onClick={() => setFeatureFilter('all')}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  featureFilter === 'all'
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${featureFilter === 'all'
                     ? 'bg-[#F53F7A] text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
+                  }`}
               >
                 All Featured ({products.length})
               </button>
               <button
                 onClick={() => setFeatureFilter('trending')}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
-                  featureFilter === 'trending'
+                className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${featureFilter === 'trending'
                     ? 'bg-[#F53F7A] text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
+                  }`}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
@@ -1240,11 +1238,10 @@ export default function CategoryManagement() {
               </button>
               <button
                 onClick={() => setFeatureFilter('best_seller')}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
-                  featureFilter === 'best_seller'
+                className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${featureFilter === 'best_seller'
                     ? 'bg-[#F53F7A] text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
+                  }`}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
@@ -1586,9 +1583,8 @@ function SortableFeatureSectionCard({
           <span className="text-xs font-semibold px-2 py-1 bg-white/50 rounded">
             Position: #{section.display_order + 1}
           </span>
-          <span className={`text-xs font-semibold px-2 py-1 rounded ${
-            section.is_active ? 'bg-green-600 text-white' : 'bg-gray-400 text-white'
-          }`}>
+          <span className={`text-xs font-semibold px-2 py-1 rounded ${section.is_active ? 'bg-green-600 text-white' : 'bg-gray-400 text-white'
+            }`}>
             {section.is_active ? 'Active' : 'Hidden'}
           </span>
         </div>
@@ -1598,11 +1594,10 @@ function SortableFeatureSectionCard({
       <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
         <button
           onClick={() => onToggleVisibility(section.id, section.is_active)}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-            section.is_active
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${section.is_active
               ? 'bg-orange-500 text-white hover:bg-orange-600'
               : 'bg-green-500 text-white hover:bg-green-600'
-          }`}
+            }`}
         >
           {section.is_active ? (
             <>
@@ -1678,7 +1673,7 @@ function SortableCategoryCard({
       </div>
 
       {/* Category Content */}
-      <div 
+      <div
         className="flex items-center gap-4 flex-1 cursor-pointer"
         onClick={() => onCategoryClick(category)}
       >
@@ -1691,15 +1686,15 @@ function SortableCategoryCard({
         )}
         <div className="flex-1">
           <div className="flex items-start justify-between gap-4 mb-2">
-        <div className="flex-1">
-          <h3 className="text-lg font-semibold text-gray-800">
-            {category.name}
-          </h3>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-gray-800">
+                {category.name}
+              </h3>
               <p className="text-sm text-gray-600 mt-1">{category.description}</p>
             </div>
             <span className={`inline-block px-3 py-1 text-xs rounded-full font-semibold whitespace-nowrap ${category.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-            {category.is_active ? 'Active' : 'Inactive'}
-          </span>
+              {category.is_active ? 'Active' : 'Inactive'}
+            </span>
           </div>
           {stats && (
             <div className="mt-3 space-y-2">
@@ -1739,11 +1734,10 @@ function SortableCategoryCard({
       <div className="flex gap-3 items-center" onClick={(e) => e.stopPropagation()}>
         <button
           onClick={() => onToggleStatus(category)}
-          className={`flex items-center gap-1.5 font-medium px-2 py-1 rounded-md transition-colors ${
-            category.is_active
+          className={`flex items-center gap-1.5 font-medium px-2 py-1 rounded-md transition-colors ${category.is_active
               ? "text-orange-600 hover:text-orange-800 hover:bg-orange-50"
               : "text-green-600 hover:text-green-800 hover:bg-green-50"
-          }`}
+            }`}
           title={category.is_active ? 'Deactivate' : 'Activate'}
         >
           {category.is_active ? (
@@ -1862,11 +1856,10 @@ function SortableProductRow({
       {/* Status */}
       <td className="px-6 py-4 whitespace-nowrap">
         <span
-          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-            product.is_active
+          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${product.is_active
               ? 'bg-green-100 text-green-800'
               : 'bg-red-100 text-red-800'
-          }`}
+            }`}
         >
           {product.is_active ? 'Active' : 'Inactive'}
         </span>
