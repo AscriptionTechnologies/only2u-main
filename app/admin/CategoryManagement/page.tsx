@@ -160,6 +160,8 @@ export default function CategoryManagement() {
   const [submitting, setSubmitting] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [exportingSku, setExportingSku] = useState(false);
+  const [showSkuExportMenu, setShowSkuExportMenu] = useState(false);
   
   // Featured products view state
   const [viewMode, setViewMode] = useState<'categories' | 'featured' | 'section-order'>('categories');
@@ -554,6 +556,146 @@ export default function CategoryManagement() {
     }
   };
 
+  const fetchAllSkus = async () => {
+    try {
+      // Fetch all products with their variants
+      const { data: productsData, error: productsError } = await supabase
+        .from('products')
+        .select('id, name, category_id, category:categories(name)');
+
+      if (productsError) {
+        throw productsError;
+      }
+
+      if (!productsData || productsData.length === 0) {
+        return [];
+      }
+
+      const productIds = productsData.map(p => p.id);
+
+      // Fetch all variants with SKUs
+      const { data: variantsData, error: variantsError } = await supabase
+        .from('product_variants')
+        .select('id, product_id, sku, size_id, size:sizes(name)')
+        .in('product_id', productIds)
+        .not('sku', 'is', null);
+
+      if (variantsError) {
+        throw variantsError;
+      }
+
+      // Combine product and variant data
+      const skuList = variantsData
+        .filter(v => v.sku && v.sku.trim() !== '')
+        .map(variant => {
+          const product = productsData.find(p => p.id === variant.product_id);
+          const categoryName = Array.isArray(product?.category)
+            ? product?.category[0]?.name || 'N/A'
+            : (product?.category as any)?.name || 'N/A';
+          
+          return {
+            sku: variant.sku,
+            productName: product?.name || 'N/A',
+            categoryName: categoryName,
+            sizeName: variant.size?.name || 'N/A',
+            productId: variant.product_id,
+            variantId: variant.id,
+          };
+        });
+
+      return skuList;
+    } catch (error) {
+      console.error('Error fetching SKUs:', error);
+      throw error;
+    }
+  };
+
+  const exportSkusToTxt = async () => {
+    try {
+      setExportingSku(true);
+      setShowSkuExportMenu(false);
+      
+      const skuList = await fetchAllSkus();
+      
+      if (skuList.length === 0) {
+        alert('No SKUs found to export.');
+        return;
+      }
+
+      // Create TXT content - one SKU per line
+      const txtContent = skuList.map(item => item.sku).join('\n');
+      
+      // Create blob and download
+      const blob = new Blob([txtContent], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `all-skus-${new Date().toISOString().split('T')[0]}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error exporting SKUs to TXT:', error);
+      alert('Failed to export SKUs. Please try again.');
+    } finally {
+      setExportingSku(false);
+    }
+  };
+
+  const exportSkusToCsv = async () => {
+    try {
+      setExportingSku(true);
+      setShowSkuExportMenu(false);
+      
+      const skuList = await fetchAllSkus();
+      
+      if (skuList.length === 0) {
+        alert('No SKUs found to export.');
+        return;
+      }
+
+      // Create CSV content with headers
+      const headers = ['SKU', 'Product Name', 'Category', 'Size'];
+      const csvRows = [
+        headers.join(','),
+        ...skuList.map(item => {
+          // Escape commas and quotes in CSV
+          const escapeCsv = (str: string) => {
+            if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+              return `"${str.replace(/"/g, '""')}"`;
+            }
+            return str;
+          };
+          return [
+            escapeCsv(item.sku),
+            escapeCsv(item.productName),
+            escapeCsv(item.categoryName),
+            escapeCsv(item.sizeName),
+          ].join(',');
+        }),
+      ];
+
+      const csvContent = csvRows.join('\n');
+      
+      // Create blob and download
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `all-skus-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error exporting SKUs to CSV:', error);
+      alert('Failed to export SKUs. Please try again.');
+    } finally {
+      setExportingSku(false);
+    }
+  };
+
   const handleExport = async () => {
     const currentView = viewMode;
     const dataset =
@@ -840,6 +982,64 @@ export default function CategoryManagement() {
             )}
             {exporting ? 'Preparing...' : exportLabel}
           </button>
+          
+          {/* Export SKU Button with Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowSkuExportMenu(!showSkuExportMenu)}
+              disabled={exportingSku}
+              className={`flex items-center gap-2 py-2 px-4 rounded-lg border transition-colors ${
+                exportingSku
+                  ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+                  : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300'
+              }`}
+            >
+              {exportingSku ? (
+                <svg className="h-4 w-4 animate-spin text-[#F53F7A]" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3.5-3.5L12 0v4a8 8 0 00-8 8h4z"></path>
+                </svg>
+              ) : (
+                <svg className="w-4 h-4 text-[#F53F7A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              )}
+              {exportingSku ? 'Exporting...' : 'Export SKU'}
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            
+            {showSkuExportMenu && (
+              <>
+                <div 
+                  className="fixed inset-0 z-10" 
+                  onClick={() => setShowSkuExportMenu(false)}
+                ></div>
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
+                  <button
+                    onClick={exportSkusToTxt}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 rounded-t-lg"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Export as TXT
+                  </button>
+                  <button
+                    onClick={exportSkusToCsv}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 rounded-b-lg"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Export as CSV
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+
           {viewMode === 'categories' && (
             <button
               className="flex items-center gap-2 py-2 px-4 bg-[#F53F7A] text-white rounded-lg hover:bg-[#F53F7A]/90 transition-colors cursor-pointer"

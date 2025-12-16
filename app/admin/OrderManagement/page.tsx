@@ -562,6 +562,95 @@ const OrderManagementPage = () => {
     }
   };
 
+  // Quick utility: download a sample tax invoice and its corresponding sales return
+  const handleDownloadSampleInvoiceAndReturn = async () => {
+    try {
+      const nowIso = new Date().toISOString();
+      const sampleOrderNumber = `SAMPLE-TAX-${new Date().getFullYear()}-0001`;
+
+      const sampleOrder: any = {
+        order_number: sampleOrderNumber,
+        created_at: nowIso,
+        billing_address: "Sample Customer, 123 Main Road, Hyderabad, Telangana, 500001, State Code: 36",
+        shipping_address: "Sample Customer, 123 Main Road, Hyderabad, Telangana, 500001, State Code: 36",
+        payment_method: "Online",
+        payment_status: "paid",
+        status: "completed",
+        notes: "Sample tax invoice (intrastate below 2500 + interstate above 2500)",
+        transaction_id: "TXN-SAMPLE-0001",
+        user: {
+          name: "Sample Customer",
+          email: "sample@example.com",
+          phone: "9999999999",
+          gstin: "36ABCDE1234F1Z5",
+        },
+        items: [
+          {
+            product_name: "Cotton Shirt",
+            product_sku: "SHIRT-001",
+            hsn_code: "6105",
+            size: "M",
+            color: "Blue",
+            quantity: 2,
+            unit_price: 1200,
+            total_price: 2400,
+            is_interstate: false, // CGST+SGST at 2.5% each (below 2500)
+            discount: 0,
+            unit_of_measurement: "PCS",
+          },
+          {
+            product_name: "Jeans",
+            product_sku: "JEAN-002",
+            hsn_code: "6203",
+            size: "32",
+            color: "Dark Blue",
+            quantity: 1,
+            unit_price: 2800,
+            total_price: 2800,
+            is_interstate: true, // IGST 18% (above 2500)
+            discount: 0,
+            unit_of_measurement: "PCS",
+          },
+        ],
+      };
+
+      const sampleReturn: any = {
+        return_number: `SAMPLE-RET-${new Date().getFullYear()}-0001`,
+        return_date: nowIso,
+        original_order_number: sampleOrderNumber,
+        original_order_date: nowIso,
+        reason: "Sample sales return",
+        status: "processed",
+        billing_address: sampleOrder.billing_address,
+        shipping_address: sampleOrder.shipping_address,
+        payment_method: sampleOrder.payment_method,
+        user: sampleOrder.user,
+        transaction_id: sampleOrder.transaction_id,
+        items: [
+          {
+            product_name: "Cotton Shirt",
+            product_sku: "SHIRT-001",
+            hsn_code: "6105",
+            size: "M",
+            color: "Blue",
+            quantity_returned: 1,
+            unit_price: 1200,
+            total_price: 1200,
+            is_interstate: false,
+            discount: 0,
+            unit_of_measurement: "PCS",
+          },
+        ],
+      };
+
+      await generateOrderPdf(sampleOrder);
+      await generateReturnInvoicePdf(sampleReturn);
+    } catch (err: any) {
+      console.error("Failed to generate sample invoice/return:", err);
+      toast.error(err?.message || "Failed to generate sample PDFs");
+    }
+  };
+
   const handleApprove = async (orderId: string) => {
     try {
       const { error } = await supabase
@@ -1095,6 +1184,15 @@ const OrderManagementPage = () => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Order Management</h1>
         <div className="flex gap-3 items-center">
+          <button
+            onClick={handleDownloadSampleInvoiceAndReturn}
+            className="flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300"
+          >
+            <svg className="w-4 h-4 text-[#F53F7A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+            </svg>
+            Sample Invoice & Return
+          </button>
           <button
             onClick={handleExport}
             disabled={exporting || currentOrders.length === 0}
