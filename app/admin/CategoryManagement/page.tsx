@@ -556,12 +556,29 @@ export default function CategoryManagement() {
     }
   };
 
+  // Helper function to create Shopify handle from product name
+  const createHandle = (name: string): string => {
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .substring(0, 255);
+  };
+
   const fetchAllSkus = async () => {
     try {
-      // Fetch all products with their variants
+      // Fetch all products with their variants, colors, and categories
       const { data: productsData, error: productsError } = await supabase
         .from('products')
-        .select('id, name, category_id, category:categories(name)');
+        .select(`
+          id, 
+          name, 
+          description,
+          category_id, 
+          vendor_name,
+          is_active,
+          category:categories(name)
+        `);
 
       if (productsError) {
         throw productsError;
@@ -571,47 +588,108 @@ export default function CategoryManagement() {
         return [];
       }
 
-      const productIds = productsData.map(p => p.id);
+      const productIds = productsData.map(p => p.id).filter(Boolean);
 
-      // Fetch all variants with SKUs
+      if (productIds.length === 0) {
+        return [];
+      }
+
+      // Fetch all variants with SKUs, sizes, colors, prices, and inventory
+      // Note: color_id can be null, so we handle it separately
       const { data: variantsData, error: variantsError } = await supabase
         .from('product_variants')
-        .select('id, product_id, sku, size_id, size:sizes(name)')
+        .select(`
+          id, 
+          product_id, 
+          sku, 
+          size_id, 
+          color_id,
+          price,
+          mrp_price,
+          quantity,
+          image_urls,
+          size:sizes(name)
+        `)
         .in('product_id', productIds)
         .not('sku', 'is', null);
 
       if (variantsError) {
+        console.error('Error fetching variants:', variantsError);
         throw variantsError;
       }
 
+      if (!variantsData || variantsData.length === 0) {
+        return [];
+      }
+
+      // Fetch colors separately for variants that have color_id
+      const colorIds = [...new Set(variantsData.map(v => v.color_id).filter(Boolean))] as string[];
+      let colorMap = new Map<string, { name: string; hex_code: string }>();
+      
+      if (colorIds.length > 0) {
+        const { data: colorsData, error: colorsError } = await supabase
+          .from('colors')
+          .select('id, name, hex_code')
+          .in('id', colorIds);
+        
+        if (!colorsError && colorsData) {
+          colorsData.forEach(color => {
+            colorMap.set(color.id, { name: color.name, hex_code: color.hex_code });
+          });
+        }
+      }
+
       // Combine product and variant data
-      const skuList = variantsData
-        .filter(v => v.sku && v.sku.trim() !== '')
+      const skuList = (variantsData || [])
+        .filter(v => v && v.sku && String(v.sku).trim() !== '')
         .map(variant => {
           const product = productsData.find(p => p.id === variant.product_id);
           const categoryName = Array.isArray(product?.category)
-            ? product?.category[0]?.name || 'N/A'
-            : (product?.category as any)?.name || 'N/A';
+            ? product?.category[0]?.name || ''
+            : (product?.category as any)?.name || '';
 
           const sizeData = variant.size as any;
           const sizeName = Array.isArray(sizeData)
             ? sizeData[0]?.name
-            : sizeData?.name || 'N/A';
+            : sizeData?.name || '';
+
+          // Get color name from colorMap
+          const colorName = variant.color_id && colorMap.has(variant.color_id)
+            ? colorMap.get(variant.color_id)!.name
+            : '';
+
+          const imageUrls = Array.isArray(variant.image_urls) ? variant.image_urls : [];
+          const firstImage = imageUrls.length > 0 ? imageUrls[0] : '';
 
           return {
-            sku: variant.sku,
-            productName: product?.name || 'N/A',
+            sku: String(variant.sku || '').trim(),
+            productName: product?.name || '',
+            productDescription: product?.description || '',
             categoryName: categoryName,
-            sizeName: sizeName || 'N/A',
+            vendorName: product?.vendor_name || '',
+            isActive: product?.is_active ?? true,
+            sizeName: sizeName || '',
+            colorName: colorName || '',
+            price: Number(variant.price) || 0,
+            mrpPrice: Number(variant.mrp_price) || Number(variant.price) || 0,
+            quantity: Number(variant.quantity) || 0,
+            imageUrl: firstImage,
             productId: variant.product_id,
             variantId: variant.id,
           };
-        });
+        })
+        .filter(item => item.sku !== ''); // Filter out any empty SKUs
 
       return skuList;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching SKUs:', error);
-      throw error;
+      console.error('Error details:', {
+        message: error?.message,
+        details: error?.details,
+        hint: error?.hint,
+        code: error?.code,
+      });
+      throw new Error(`Failed to fetch SKUs: ${error?.message || 'Unknown error'}`);
     }
   };
 
@@ -655,47 +733,175 @@ export default function CategoryManagement() {
 
       const skuList = await fetchAllSkus();
 
-      if (skuList.length === 0) {
+      if (!skuList || skuList.length === 0) {
         alert('No SKUs found to export.');
+        setExportingSku(false);
         return;
       }
 
-      // Create CSV content with headers
-      const headers = ['SKU', 'Product Name', 'Category', 'Size'];
-      const csvRows = [
-        headers.join(','),
-        ...skuList.map(item => {
-          // Escape commas and quotes in CSV
-          const escapeCsv = (str: string) => {
-            if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-              return `"${str.replace(/"/g, '""')}"`;
-            }
-            return str;
-          };
-          return [
-            escapeCsv(item.sku),
-            escapeCsv(item.productName),
-            escapeCsv(item.categoryName),
-            escapeCsv(item.sizeName),
-          ].join(',');
-        }),
+      // Helper function to escape CSV values
+      const escapeCsv = (value: any): string => {
+        if (value === null || value === undefined) return '';
+        const str = String(value);
+        if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+          return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+      };
+
+      // Group variants by product to create Shopify format
+      const productMap = new Map<string, typeof skuList>();
+      skuList.forEach(item => {
+        if (!productMap.has(item.productId)) {
+          productMap.set(item.productId, []);
+        }
+        productMap.get(item.productId)!.push(item);
+      });
+
+      // Shopify CSV headers (standard product import format)
+      const headers = [
+        'Handle',
+        'Title',
+        'Body (HTML)',
+        'Vendor',
+        'Type',
+        'Tags',
+        'Published',
+        'Option1 Name',
+        'Option1 Value',
+        'Option2 Name',
+        'Option2 Value',
+        'Variant SKU',
+        'Variant Grams',
+        'Variant Inventory Tracker',
+        'Variant Inventory Qty',
+        'Variant Inventory Policy',
+        'Variant Fulfillment Service',
+        'Variant Price',
+        'Variant Compare At Price',
+        'Variant Requires Shipping',
+        'Variant Taxable',
+        'Variant Barcode',
+        'Image Src',
+        'Image Position',
+        'Image Alt Text',
+        'Gift Card',
+        'SEO Title',
+        'SEO Description',
+        'Google Shopping / Google Product Category',
+        'Google Shopping / Gender',
+        'Google Shopping / Age Group',
+        'Google Shopping / MPN',
+        'Google Shopping / AdWords Grouping',
+        'Google Shopping / AdWords Labels',
+        'Google Shopping / Condition',
+        'Google Shopping / Custom Product',
+        'Google Shopping / Custom Label 0',
+        'Google Shopping / Custom Label 1',
+        'Google Shopping / Custom Label 2',
+        'Google Shopping / Custom Label 3',
+        'Google Shopping / Custom Label 4',
+        'Variant Image',
+        'Variant Weight Unit',
+        'Variant Tax Code',
+        'Cost per item',
       ];
+
+      const csvRows: string[] = [headers.join(',')];
+
+      // Process each product and its variants
+      productMap.forEach((variants, productId) => {
+        if (variants.length === 0) return;
+
+        const firstVariant = variants[0];
+        const handle = createHandle(firstVariant.productName);
+        const productName = firstVariant.productName;
+        const productDescription = firstVariant.productDescription || '';
+        const vendor = firstVariant.vendorName || '';
+        const category = firstVariant.categoryName || '';
+        const isPublished = firstVariant.isActive ? 'TRUE' : 'FALSE';
+
+        // Determine option names based on available data
+        const hasSize = variants.some(v => v.sizeName);
+        const hasColor = variants.some(v => v.colorName);
+        const option1Name = hasSize ? 'Size' : (hasColor ? 'Color' : '');
+        const option2Name = (hasSize && hasColor) ? 'Color' : '';
+
+        // Create a row for each variant
+        variants.forEach((variant, index) => {
+          const option1Value = option1Name === 'Size' ? variant.sizeName : (option1Name === 'Color' ? variant.colorName : '');
+          const option2Value = option2Name === 'Color' ? variant.colorName : '';
+          
+          const row = [
+            escapeCsv(handle), // Handle
+            escapeCsv(productName), // Title
+            escapeCsv(productDescription), // Body (HTML)
+            escapeCsv(vendor), // Vendor
+            escapeCsv(category), // Type
+            '', // Tags
+            escapeCsv(isPublished), // Published
+            escapeCsv(option1Name), // Option1 Name
+            escapeCsv(option1Value), // Option1 Value
+            escapeCsv(option2Name), // Option2 Name
+            escapeCsv(option2Value), // Option2 Value
+            escapeCsv(variant.sku), // Variant SKU
+            '', // Variant Grams
+            'shopify', // Variant Inventory Tracker
+            escapeCsv(variant.quantity), // Variant Inventory Qty
+            'deny', // Variant Inventory Policy
+            'manual', // Variant Fulfillment Service
+            escapeCsv(variant.price), // Variant Price
+            escapeCsv(variant.mrpPrice), // Variant Compare At Price
+            'TRUE', // Variant Requires Shipping
+            'TRUE', // Variant Taxable
+            '', // Variant Barcode
+            escapeCsv(index === 0 ? variant.imageUrl : ''), // Image Src (first variant only)
+            escapeCsv(index === 0 ? '1' : ''), // Image Position
+            escapeCsv(productName), // Image Alt Text
+            'FALSE', // Gift Card
+            escapeCsv(productName), // SEO Title
+            escapeCsv(productDescription), // SEO Description
+            '', // Google Shopping / Google Product Category
+            '', // Google Shopping / Gender
+            '', // Google Shopping / Age Group
+            '', // Google Shopping / MPN
+            '', // Google Shopping / AdWords Grouping
+            '', // Google Shopping / AdWords Labels
+            'new', // Google Shopping / Condition
+            'FALSE', // Google Shopping / Custom Product
+            '', // Google Shopping / Custom Label 0
+            '', // Google Shopping / Custom Label 1
+            '', // Google Shopping / Custom Label 2
+            '', // Google Shopping / Custom Label 3
+            '', // Google Shopping / Custom Label 4
+            escapeCsv(variant.imageUrl), // Variant Image
+            'kg', // Variant Weight Unit
+            '', // Variant Tax Code
+            '', // Cost per item
+          ];
+
+          csvRows.push(row.join(','));
+        });
+      });
 
       const csvContent = csvRows.join('\n');
 
-      // Create blob and download
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      // Add BOM for Excel compatibility
+      const BOM = '\uFEFF';
+      const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `all-skus-${new Date().toISOString().split('T')[0]}.csv`;
+      link.download = `shopify-products-${new Date().toISOString().split('T')[0]}.csv`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error exporting SKUs to CSV:', error);
-      alert('Failed to export SKUs. Please try again.');
+      const errorMessage = error?.message || 'Unknown error occurred';
+      console.error('Full error details:', error);
+      alert(`Failed to export SKUs: ${errorMessage}. Please check the console for details.`);
     } finally {
       setExportingSku(false);
     }
@@ -1007,7 +1213,7 @@ export default function CategoryManagement() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               )}
-              {exportingSku ? 'Exporting...' : 'Export SKU'}
+              {exportingSku ? 'Exporting...' : 'Export for Shopify'}
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
@@ -1036,7 +1242,7 @@ export default function CategoryManagement() {
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
-                    Export as CSV
+                    Export as Shopify CSV
                   </button>
                 </div>
               </>

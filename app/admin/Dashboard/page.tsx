@@ -14,6 +14,7 @@ export default function DashboardPage() {
     users: 0,
     products: 0,
     orders: 0,
+    productsToday: 0,
   });
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [topProducts, setTopProducts] = useState<any[]>([]);
@@ -49,6 +50,15 @@ export default function DashboardPage() {
       const { count: ordersCount } = await supabase
         .from("orders")
         .select("id", { count: "exact", head: true });
+
+      // Products uploaded today
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const { count: productsTodayCount } = await supabase
+        .from("products")
+        .select("id", { count: "exact", head: true })
+        .gte("created_at", today.toISOString());
+
       let revenue = 0;
       if (orders && Array.isArray(orders)) {
         revenue = orders.reduce((sum, o) => sum + (o.total_amount || 0), 0);
@@ -88,6 +98,7 @@ export default function DashboardPage() {
         users: usersCount || 0,
         products: productsCount || 0,
         orders: ordersCount || 0,
+        productsToday: productsTodayCount || 0,
       });
       setCouponStats({
         totalUses: couponAggregates.totalUses,
@@ -183,6 +194,13 @@ export default function DashboardPage() {
           </div>
         </div>
         <div className="bg-white rounded-lg p-4 shadow flex items-center gap-4">
+          <div className="bg-blue-100 p-3 rounded-full"><TrendingUp className="text-blue-600" size={28} /></div>
+          <div>
+            <p className="text-gray-500 text-sm">Products Today</p>
+            <h2 className="text-xl font-semibold">{stats.productsToday}</h2>
+          </div>
+        </div>
+        <div className="bg-white rounded-lg p-4 shadow flex items-center gap-4">
           <div className="bg-yellow-100 p-3 rounded-full"><Package className="text-yellow-600" size={28} /></div>
           <div>
             <p className="text-gray-500 text-sm">Total Orders</p>
@@ -207,7 +225,7 @@ export default function DashboardPage() {
 
       {/* Recent Orders Table */}
       <div className="bg-white rounded-lg shadow p-6 mb-8">
-        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2"><Package className="text-yellow-600" size={20}/> Recent Orders</h2>
+        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2"><Package className="text-yellow-600" size={20} /> Recent Orders</h2>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -232,11 +250,10 @@ export default function DashboardPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{order.total_amount?.toLocaleString()}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        order.status === 'approved' ? 'bg-green-100 text-green-800' :
-                        order.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                        'bg-yellow-100 text-yellow-800'
-                      }`}>
+                      <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${order.status === 'approved' ? 'bg-green-100 text-green-800' :
+                          order.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                            'bg-yellow-100 text-yellow-800'
+                        }`}>
                         {order.status}
                       </span>
                     </td>
@@ -253,7 +270,7 @@ export default function DashboardPage() {
 
       {/* Top Products Section */}
       <div className="bg-white rounded-lg shadow p-6 mb-8">
-        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2"><TrendingUp className="text-[#F53F7A]" size={20}/> Top Products</h2>
+        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2"><TrendingUp className="text-[#F53F7A]" size={20} /> Top Products</h2>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
