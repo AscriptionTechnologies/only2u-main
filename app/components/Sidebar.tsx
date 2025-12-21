@@ -21,7 +21,8 @@ import {
   Star,
   FileText,
   BarChart3,
-  Archive
+  Archive,
+  Sparkles
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import Logo from "./Logo";
@@ -38,6 +39,12 @@ const Sidebar = () => {
       icon: Home,
       link: "/admin/Dashboard",
       path: "Dashboard",
+    },
+    {
+      name: "Talk with Data",
+      icon: Sparkles,
+      link: "/admin/DataChat",
+      path: "DataChat",
     },
     {
       name: "Order Management",

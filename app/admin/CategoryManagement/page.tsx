@@ -577,7 +577,8 @@ export default function CategoryManagement() {
           category_id, 
           vendor_name,
           is_active,
-          category:categories(name)
+          is_active,
+          category:categories(name, hsn_code)
         `);
 
       if (productsError) {
@@ -625,13 +626,13 @@ export default function CategoryManagement() {
       // Fetch colors separately for variants that have color_id
       const colorIds = [...new Set(variantsData.map(v => v.color_id).filter(Boolean))] as string[];
       let colorMap = new Map<string, { name: string; hex_code: string }>();
-      
+
       if (colorIds.length > 0) {
         const { data: colorsData, error: colorsError } = await supabase
           .from('colors')
           .select('id, name, hex_code')
           .in('id', colorIds);
-        
+
         if (!colorsError && colorsData) {
           colorsData.forEach(color => {
             colorMap.set(color.id, { name: color.name, hex_code: color.hex_code });
@@ -647,6 +648,10 @@ export default function CategoryManagement() {
           const categoryName = Array.isArray(product?.category)
             ? product?.category[0]?.name || ''
             : (product?.category as any)?.name || '';
+
+          const hsnCode = Array.isArray(product?.category)
+            ? product?.category[0]?.hsn_code || ''
+            : (product?.category as any)?.hsn_code || '';
 
           const sizeData = variant.size as any;
           const sizeName = Array.isArray(sizeData)
@@ -666,6 +671,7 @@ export default function CategoryManagement() {
             productName: product?.name || '',
             productDescription: product?.description || '',
             categoryName: categoryName,
+            hsnCode: hsnCode,
             vendorName: product?.vendor_name || '',
             isActive: product?.is_active ?? true,
             sizeName: sizeName || '',
@@ -805,6 +811,7 @@ export default function CategoryManagement() {
         'Variant Weight Unit',
         'Variant Tax Code',
         'Cost per item',
+        'HSN Code',
       ];
 
       const csvRows: string[] = [headers.join(',')];
@@ -831,7 +838,7 @@ export default function CategoryManagement() {
         variants.forEach((variant, index) => {
           const option1Value = option1Name === 'Size' ? variant.sizeName : (option1Name === 'Color' ? variant.colorName : '');
           const option2Value = option2Name === 'Color' ? variant.colorName : '';
-          
+
           const row = [
             escapeCsv(handle), // Handle
             escapeCsv(productName), // Title
@@ -878,6 +885,7 @@ export default function CategoryManagement() {
             'kg', // Variant Weight Unit
             '', // Variant Tax Code
             '', // Cost per item
+            escapeCsv(variant.hsnCode), // HSN Code
           ];
 
           csvRows.push(row.join(','));
@@ -1176,8 +1184,8 @@ export default function CategoryManagement() {
             onClick={handleExport}
             disabled={exporting || currentDatasetCount === 0}
             className={`flex items-center gap-2 py-2 px-4 rounded-lg border transition-colors ${exporting || currentDatasetCount === 0
-                ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
-                : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300'
+              ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+              : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300'
               }`}
           >
             {exporting ? (
@@ -1199,8 +1207,8 @@ export default function CategoryManagement() {
               onClick={() => setShowSkuExportMenu(!showSkuExportMenu)}
               disabled={exportingSku}
               className={`flex items-center gap-2 py-2 px-4 rounded-lg border transition-colors ${exportingSku
-                  ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
-                  : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300'
+                ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+                : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300'
                 }`}
             >
               {exportingSku ? (
@@ -1270,8 +1278,8 @@ export default function CategoryManagement() {
             <button
               onClick={() => setViewMode('categories')}
               className={`${viewMode === 'categories'
-                  ? 'border-[#F53F7A] text-[#F53F7A]'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ? 'border-[#F53F7A] text-[#F53F7A]'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-2`}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1287,8 +1295,8 @@ export default function CategoryManagement() {
             <button
               onClick={() => setViewMode('section-order')}
               className={`${viewMode === 'section-order'
-                  ? 'border-[#F53F7A] text-[#F53F7A]'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ? 'border-[#F53F7A] text-[#F53F7A]'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-2`}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1299,8 +1307,8 @@ export default function CategoryManagement() {
             <button
               onClick={() => setViewMode('featured')}
               className={`${viewMode === 'featured'
-                  ? 'border-[#F53F7A] text-[#F53F7A]'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ? 'border-[#F53F7A] text-[#F53F7A]'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-2`}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1424,8 +1432,8 @@ export default function CategoryManagement() {
               <button
                 onClick={() => setFeatureFilter('all')}
                 className={`px-4 py-2 rounded-lg font-medium transition-colors ${featureFilter === 'all'
-                    ? 'bg-[#F53F7A] text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ? 'bg-[#F53F7A] text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
               >
                 All Featured ({products.length})
@@ -1433,8 +1441,8 @@ export default function CategoryManagement() {
               <button
                 onClick={() => setFeatureFilter('trending')}
                 className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${featureFilter === 'trending'
-                    ? 'bg-[#F53F7A] text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ? 'bg-[#F53F7A] text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1445,8 +1453,8 @@ export default function CategoryManagement() {
               <button
                 onClick={() => setFeatureFilter('best_seller')}
                 className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${featureFilter === 'best_seller'
-                    ? 'bg-[#F53F7A] text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ? 'bg-[#F53F7A] text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1801,8 +1809,8 @@ function SortableFeatureSectionCard({
         <button
           onClick={() => onToggleVisibility(section.id, section.is_active)}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${section.is_active
-              ? 'bg-orange-500 text-white hover:bg-orange-600'
-              : 'bg-green-500 text-white hover:bg-green-600'
+            ? 'bg-orange-500 text-white hover:bg-orange-600'
+            : 'bg-green-500 text-white hover:bg-green-600'
             }`}
         >
           {section.is_active ? (
@@ -1941,8 +1949,8 @@ function SortableCategoryCard({
         <button
           onClick={() => onToggleStatus(category)}
           className={`flex items-center gap-1.5 font-medium px-2 py-1 rounded-md transition-colors ${category.is_active
-              ? "text-orange-600 hover:text-orange-800 hover:bg-orange-50"
-              : "text-green-600 hover:text-green-800 hover:bg-green-50"
+            ? "text-orange-600 hover:text-orange-800 hover:bg-orange-50"
+            : "text-green-600 hover:text-green-800 hover:bg-green-50"
             }`}
           title={category.is_active ? 'Deactivate' : 'Activate'}
         >
@@ -2063,8 +2071,8 @@ function SortableProductRow({
       <td className="px-6 py-4 whitespace-nowrap">
         <span
           className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${product.is_active
-              ? 'bg-green-100 text-green-800'
-              : 'bg-red-100 text-red-800'
+            ? 'bg-green-100 text-green-800'
+            : 'bg-red-100 text-red-800'
             }`}
         >
           {product.is_active ? 'Active' : 'Inactive'}
