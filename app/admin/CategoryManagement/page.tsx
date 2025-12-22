@@ -577,8 +577,9 @@ export default function CategoryManagement() {
           category_id, 
           vendor_name,
           is_active,
-          is_active,
-          category:categories(name, hsn_code)
+
+          hsn_code,
+          category:categories(name)
         `);
 
       if (productsError) {
@@ -649,9 +650,7 @@ export default function CategoryManagement() {
             ? product?.category[0]?.name || ''
             : (product?.category as any)?.name || '';
 
-          const hsnCode = Array.isArray(product?.category)
-            ? product?.category[0]?.hsn_code || ''
-            : (product?.category as any)?.hsn_code || '';
+          const hsnCode = (product as any)?.hsn_code || '';
 
           const sizeData = variant.size as any;
           const sizeName = Array.isArray(sizeData)
