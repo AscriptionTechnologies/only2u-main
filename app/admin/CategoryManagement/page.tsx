@@ -567,8 +567,32 @@ export default function CategoryManagement() {
 
   const fetchAllSkus = async () => {
     try {
-      // Fetch all products with their variants, colors, and categories
-      const { data: productsData, error: productsError } = await supabase
+      // Helper to fetch all rows with pagination
+      const fetchAllRows = async (table: string, queryBuilder: any) => {
+        let allRows: any[] = [];
+        let page = 0;
+        const pageSize = 1000;
+        let hasMore = true;
+
+        while (hasMore) {
+          const { data, error } = await queryBuilder
+            .range(page * pageSize, (page + 1) * pageSize - 1);
+
+          if (error) throw error;
+
+          if (data) {
+            allRows = [...allRows, ...data];
+            if (data.length < pageSize) hasMore = false;
+          } else {
+            hasMore = false;
+          }
+          page++;
+        }
+        return allRows;
+      };
+
+      // Fetch all products
+      let queryProducts = supabase
         .from('products')
         .select(`
           id, 
@@ -577,28 +601,24 @@ export default function CategoryManagement() {
           category_id, 
           vendor_name,
           is_active,
-
           hsn_code,
           category:categories(name)
         `);
 
-      if (productsError) {
-        throw productsError;
-      }
+      const productsData = await fetchAllRows('products', queryProducts);
 
       if (!productsData || productsData.length === 0) {
         return [];
       }
 
-      const productIds = productsData.map(p => p.id).filter(Boolean);
+      const productIds = productsData.map((p: any) => p.id).filter(Boolean);
 
       if (productIds.length === 0) {
         return [];
       }
 
-      // Fetch all variants with SKUs, sizes, colors, prices, and inventory
-      // Note: color_id can be null, so we handle it separately
-      const { data: variantsData, error: variantsError } = await supabase
+      // Fetch all variants
+      let queryVariants = supabase
         .from('product_variants')
         .select(`
           id, 
@@ -612,20 +632,16 @@ export default function CategoryManagement() {
           image_urls,
           size:sizes(name)
         `)
-        .in('product_id', productIds)
         .not('sku', 'is', null);
 
-      if (variantsError) {
-        console.error('Error fetching variants:', variantsError);
-        throw variantsError;
-      }
+      const variantsData = await fetchAllRows('product_variants', queryVariants);
 
       if (!variantsData || variantsData.length === 0) {
         return [];
       }
 
-      // Fetch colors separately for variants that have color_id
-      const colorIds = [...new Set(variantsData.map(v => v.color_id).filter(Boolean))] as string[];
+      // Fetch colors
+      const colorIds = [...new Set(variantsData.map((v: any) => v.color_id).filter(Boolean))] as string[];
       let colorMap = new Map<string, { name: string; hex_code: string }>();
 
       if (colorIds.length > 0) {
@@ -643,9 +659,9 @@ export default function CategoryManagement() {
 
       // Combine product and variant data
       const skuList = (variantsData || [])
-        .filter(v => v && v.sku && String(v.sku).trim() !== '')
-        .map(variant => {
-          const product = productsData.find(p => p.id === variant.product_id);
+        .filter((v: any) => v && v.sku && String(v.sku).trim() !== '')
+        .map((variant: any) => {
+          const product = productsData.find((p: any) => p.id === variant.product_id);
           const categoryName = Array.isArray(product?.category)
             ? product?.category[0]?.name || ''
             : (product?.category as any)?.name || '';
@@ -683,7 +699,7 @@ export default function CategoryManagement() {
             variantId: variant.id,
           };
         })
-        .filter(item => item.sku !== ''); // Filter out any empty SKUs
+        .filter((item: any) => item.sku !== '');
 
       return skuList;
     } catch (error: any) {
@@ -763,54 +779,66 @@ export default function CategoryManagement() {
         productMap.get(item.productId)!.push(item);
       });
 
-      // Shopify CSV headers (standard product import format)
+      // Shopify CSV headers (Matching User Template)
       const headers = [
-        'Handle',
-        'Title',
-        'Body (HTML)',
-        'Vendor',
-        'Type',
-        'Tags',
-        'Published',
-        'Option1 Name',
-        'Option1 Value',
-        'Option2 Name',
-        'Option2 Value',
-        'Variant SKU',
-        'Variant Grams',
-        'Variant Inventory Tracker',
-        'Variant Inventory Qty',
-        'Variant Inventory Policy',
-        'Variant Fulfillment Service',
-        'Variant Price',
-        'Variant Compare At Price',
-        'Variant Requires Shipping',
-        'Variant Taxable',
-        'Variant Barcode',
-        'Image Src',
-        'Image Position',
-        'Image Alt Text',
-        'Gift Card',
-        'SEO Title',
-        'SEO Description',
-        'Google Shopping / Google Product Category',
-        'Google Shopping / Gender',
-        'Google Shopping / Age Group',
-        'Google Shopping / MPN',
-        'Google Shopping / AdWords Grouping',
-        'Google Shopping / AdWords Labels',
-        'Google Shopping / Condition',
-        'Google Shopping / Custom Product',
-        'Google Shopping / Custom Label 0',
-        'Google Shopping / Custom Label 1',
-        'Google Shopping / Custom Label 2',
-        'Google Shopping / Custom Label 3',
-        'Google Shopping / Custom Label 4',
-        'Variant Image',
-        'Variant Weight Unit',
-        'Variant Tax Code',
-        'Cost per item',
-        'HSN Code',
+        "Title",
+        "URL handle",
+        "Description",
+        "Vendor",
+        "Product category",
+        "Type",
+        "Tags",
+        "Published on online store",
+        "Status",
+        "SKU",
+        "Barcode",
+        "Option1 name",
+        "Option1 value",
+        "Option1 Linked To",
+        "Option2 name",
+        "Option2 value",
+        "Option2 Linked To",
+        "Option3 name",
+        "Option3 value",
+        "Option3 Linked To",
+        "Price",
+        "Compare-at price",
+        "Cost per item",
+        "Charge tax",
+        "Tax code",
+        "Unit price total measure",
+        "Unit price total measure unit",
+        "Unit price base measure",
+        "Unit price base measure unit",
+        "Inventory tracker",
+        "Inventory quantity",
+        "Continue selling when out of stock",
+        "Weight value (grams)",
+        "Weight unit for display",
+        "Requires shipping",
+        "Fulfillment service",
+        "Product image URL",
+        "Image position",
+        "Image alt text",
+        "Variant image URL",
+        "Gift card",
+        "SEO title",
+        "SEO description",
+        "Color (product.metafields.shopify.color-pattern)",
+        "Google Shopping / Google product category",
+        "Google Shopping / Gender",
+        "Google Shopping / Age group",
+        "Google Shopping / Manufacturer part number (MPN)",
+        "Google Shopping / Ad group name",
+        "Google Shopping / Ads labels",
+        "Google Shopping / Condition",
+        "Google Shopping / Custom product",
+        "Google Shopping / Custom label 0",
+        "Google Shopping / Custom label 1",
+        "Google Shopping / Custom label 2",
+        "Google Shopping / Custom label 3",
+        "Google Shopping / Custom label 4",
+        "HSN Code"
       ];
 
       const csvRows: string[] = [headers.join(',')];
@@ -820,12 +848,17 @@ export default function CategoryManagement() {
         if (variants.length === 0) return;
 
         const firstVariant = variants[0];
-        const handle = createHandle(firstVariant.productName);
-        const productName = firstVariant.productName;
+        // Append SKU to handle and title to ensure strict uniqueness and clarity
+        const skuSuffix = firstVariant.sku ? `-${firstVariant.sku}` : `-${productId.substring(0, 8)}`;
+        const handle = `${createHandle(firstVariant.productName)}${skuSuffix}`;
+        const productName = `${firstVariant.productName}${firstVariant.sku ? ` (${firstVariant.sku})` : ''}`;
         const productDescription = firstVariant.productDescription || '';
         const vendor = firstVariant.vendorName || '';
         const category = firstVariant.categoryName || '';
+        // If active, 'Published on online store' is TRUE
         const isPublished = firstVariant.isActive ? 'TRUE' : 'FALSE';
+        // Status can be Active or Draft
+        const status = firstVariant.isActive ? 'Active' : 'Draft';
 
         // Determine option names based on available data
         const hasSize = variants.some(v => v.sizeName);
@@ -833,57 +866,88 @@ export default function CategoryManagement() {
         const option1Name = hasSize ? 'Size' : (hasColor ? 'Color' : '');
         const option2Name = (hasSize && hasColor) ? 'Color' : '';
 
+        // Track images to avoid duplicate positions for the same URL
+        const processedImages = new Set<string>();
+        let imagePositionCounter = 1;
+
         // Create a row for each variant
         variants.forEach((variant, index) => {
+          const isFirstRow = index === 0;
           const option1Value = option1Name === 'Size' ? variant.sizeName : (option1Name === 'Color' ? variant.colorName : '');
           const option2Value = option2Name === 'Color' ? variant.colorName : '';
 
+          let rowImageSrc = '';
+          let rowImagePos = '';
+          let rowImageAlt = '';
+
+          // Only declare the image as a "Product Image" (Src/Pos) if it hasn't been declared yet
+          if (variant.imageUrl && !processedImages.has(variant.imageUrl)) {
+            rowImageSrc = variant.imageUrl;
+            rowImagePos = String(imagePositionCounter++);
+            rowImageAlt = productName;
+            processedImages.add(variant.imageUrl);
+          }
+
+          // Match the columns exactly to the headers provided
+          // Only strict fields on first row, empty on others (except critical identity fields)
           const row = [
-            escapeCsv(handle), // Handle
-            escapeCsv(productName), // Title
-            escapeCsv(productDescription), // Body (HTML)
-            escapeCsv(vendor), // Vendor
-            escapeCsv(category), // Type
+            escapeCsv(isFirstRow ? productName : ''), // Title (Only first row)
+            escapeCsv(handle), // URL handle (Required on all rows)
+            escapeCsv(isFirstRow ? productDescription : ''), // Description (Only first row)
+            escapeCsv(isFirstRow ? vendor : ''), // Vendor (Only first row)
+            '', // Product category
+            escapeCsv(isFirstRow ? category : ''), // Type (Only first row)
             '', // Tags
-            escapeCsv(isPublished), // Published
-            escapeCsv(option1Name), // Option1 Name
-            escapeCsv(option1Value), // Option1 Value
-            escapeCsv(option2Name), // Option2 Name
-            escapeCsv(option2Value), // Option2 Value
-            escapeCsv(variant.sku), // Variant SKU
-            '', // Variant Grams
-            'shopify', // Variant Inventory Tracker
-            escapeCsv(variant.quantity), // Variant Inventory Qty
-            'deny', // Variant Inventory Policy
-            'manual', // Variant Fulfillment Service
-            escapeCsv(variant.price), // Variant Price
-            escapeCsv(variant.mrpPrice), // Variant Compare At Price
-            'TRUE', // Variant Requires Shipping
-            'TRUE', // Variant Taxable
-            '', // Variant Barcode
-            escapeCsv(index === 0 ? variant.imageUrl : ''), // Image Src (first variant only)
-            escapeCsv(index === 0 ? '1' : ''), // Image Position
-            escapeCsv(productName), // Image Alt Text
-            'FALSE', // Gift Card
-            escapeCsv(productName), // SEO Title
-            escapeCsv(productDescription), // SEO Description
-            '', // Google Shopping / Google Product Category
-            '', // Google Shopping / Gender
-            '', // Google Shopping / Age Group
-            '', // Google Shopping / MPN
-            '', // Google Shopping / AdWords Grouping
-            '', // Google Shopping / AdWords Labels
-            'new', // Google Shopping / Condition
-            'FALSE', // Google Shopping / Custom Product
-            '', // Google Shopping / Custom Label 0
-            '', // Google Shopping / Custom Label 1
-            '', // Google Shopping / Custom Label 2
-            '', // Google Shopping / Custom Label 3
-            '', // Google Shopping / Custom Label 4
-            escapeCsv(variant.imageUrl), // Variant Image
-            'kg', // Variant Weight Unit
-            '', // Variant Tax Code
+            escapeCsv(isFirstRow ? isPublished : ''), // Published on online store (Only first row)
+            escapeCsv(isFirstRow ? status : ''), // Status (Only first row)
+            escapeCsv(variant.sku), // SKU
+            '', // Barcode
+            escapeCsv(option1Name), // Option1 name
+            escapeCsv(option1Value), // Option1 value
+            '', // Option1 Linked To
+            escapeCsv(option2Name), // Option2 name
+            escapeCsv(option2Value), // Option2 value
+            '', // Option2 Linked To
+            '', // Option3 name
+            '', // Option3 value
+            '', // Option3 Linked To
+            escapeCsv(variant.price), // Price
+            escapeCsv(variant.mrpPrice), // Compare-at price
             '', // Cost per item
+            'TRUE', // Charge tax
+            '', // Tax code
+            '', // Unit price total measure
+            '', // Unit price total measure unit
+            '', // Unit price base measure
+            '', // Unit price base measure unit
+            'shopify', // Inventory tracker
+            escapeCsv(variant.quantity), // Inventory quantity
+            'deny', // Continue selling when out of stock
+            '', // Weight value (grams)
+            'kg', // Weight unit for display
+            'TRUE', // Requires shipping
+            'manual', // Fulfillment service
+            escapeCsv(rowImageSrc), // Product image URL (Deduplicated)
+            escapeCsv(rowImagePos), // Image position (Deduplicated)
+            escapeCsv(rowImageAlt), // Image alt text
+            escapeCsv(variant.imageUrl), // Variant image URL (Can be repeated, references Src)
+            'FALSE', // Gift card
+            escapeCsv(isFirstRow ? productName : ''), // SEO title
+            escapeCsv(isFirstRow ? productDescription : ''), // SEO description
+            '', // Color (product.metafields.shopify.color-pattern)
+            '', // Google Shopping / Google product category
+            '', // Google Shopping / Gender
+            '', // Google Shopping / Age group
+            '', // Google Shopping / Manufacturer part number (MPN)
+            '', // Google Shopping / Ad group name
+            '', // Google Shopping / Ads labels
+            'new', // Google Shopping / Condition
+            'FALSE', // Google Shopping / Custom product
+            '', // Google Shopping / Custom label 0
+            '', // Google Shopping / Custom label 1
+            '', // Google Shopping / Custom label 2
+            '', // Google Shopping / Custom label 3
+            '', // Google Shopping / Custom label 4
             escapeCsv(variant.hsnCode), // HSN Code
           ];
 
@@ -899,7 +963,7 @@ export default function CategoryManagement() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `shopify-products-${new Date().toISOString().split('T')[0]}.csv`;
+      link.download = `shopify-products-template-${new Date().toISOString().split('T')[0]}.csv`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

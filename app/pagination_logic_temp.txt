@@ -1,0 +1,150 @@
+  const fetchAllSkus = async () => {
+    try {
+      // Helper to fetch all rows with pagination
+      const fetchAllRows = async (table: string, queryBuilder: any) => {
+        let allRows: any[] = [];
+        let page = 0;
+        const pageSize = 1000;
+        let hasMore = true;
+
+        while (hasMore) {
+          const { data, error } = await queryBuilder
+            .range(page * pageSize, (page + 1) * pageSize - 1);
+          
+          if (error) throw error;
+          
+          if (data) {
+            allRows = [...allRows, ...data];
+            if (data.length < pageSize) hasMore = false;
+          } else {
+            hasMore = false;
+          }
+          page++;
+        }
+        return allRows;
+      };
+
+      // Fetch all products
+      let queryProducts = supabase
+        .from('products')
+        .select(`
+          id, 
+          name, 
+          description,
+          category_id, 
+          vendor_name,
+          is_active,
+          hsn_code,
+          category:categories(name)
+        `);
+      
+      const productsData = await fetchAllRows('products', queryProducts);
+
+      if (!productsData || productsData.length === 0) {
+        return [];
+      }
+
+      const productIds = productsData.map((p: any) => p.id).filter(Boolean);
+
+      if (productIds.length === 0) {
+        return [];
+      }
+
+      // Fetch all variants (chunked by product IDs if necessary, but simple pagination here usually works if total rows < 10k ok)
+      // If productIds is HUGE, we might need to chunk the `in` clause, but for 360 products it's fine.
+      let queryVariants = supabase
+        .from('product_variants')
+        .select(`
+          id, 
+          product_id, 
+          sku, 
+          size_id, 
+          color_id,
+          price,
+          mrp_price,
+          quantity,
+          image_urls,
+          size:sizes(name)
+        `)
+        .in('product_id', productIds)
+        .not('sku', 'is', null);
+
+      const variantsData = await fetchAllRows('product_variants', queryVariants);
+
+      if (!variantsData || variantsData.length === 0) {
+        return [];
+      }
+
+      // Fetch colors
+      const colorIds = [...new Set(variantsData.map((v: any) => v.color_id).filter(Boolean))] as string[];
+      let colorMap = new Map<string, { name: string; hex_code: string }>();
+
+      if (colorIds.length > 0) {
+        const { data: colorsData, error: colorsError } = await supabase
+          .from('colors')
+          .select('id, name, hex_code')
+          .in('id', colorIds); // Colors usually few enough to fit in one page
+
+        if (!colorsError && colorsData) {
+          colorsData.forEach(color => {
+            colorMap.set(color.id, { name: color.name, hex_code: color.hex_code });
+          });
+        }
+      }
+
+      // Combine product and variant data
+      const skuList = (variantsData || [])
+        .filter((v: any) => v && v.sku && String(v.sku).trim() !== '')
+        .map((variant: any) => {
+          const product = productsData.find((p: any) => p.id === variant.product_id);
+          const categoryName = Array.isArray(product?.category)
+            ? product?.category[0]?.name || ''
+            : (product?.category as any)?.name || '';
+
+          const hsnCode = (product as any)?.hsn_code || '';
+
+          const sizeData = variant.size as any;
+          const sizeName = Array.isArray(sizeData)
+            ? sizeData[0]?.name
+            : sizeData?.name || '';
+
+          // Get color name from colorMap
+          const colorName = variant.color_id && colorMap.has(variant.color_id)
+            ? colorMap.get(variant.color_id)!.name
+            : '';
+
+          const imageUrls = Array.isArray(variant.image_urls) ? variant.image_urls : [];
+          const firstImage = imageUrls.length > 0 ? imageUrls[0] : '';
+
+          return {
+            sku: String(variant.sku || '').trim(),
+            productName: product?.name || '',
+            productDescription: product?.description || '',
+            categoryName: categoryName,
+            hsnCode: hsnCode,
+            vendorName: product?.vendor_name || '',
+            isActive: product?.is_active ?? true,
+            sizeName: sizeName || '',
+            colorName: colorName || '',
+            price: Number(variant.price) || 0,
+            mrpPrice: Number(variant.mrp_price) || Number(variant.price) || 0,
+            quantity: Number(variant.quantity) || 0,
+            imageUrl: firstImage,
+            productId: variant.product_id,
+            variantId: variant.id,
+          };
+        })
+        .filter((item: any) => item.sku !== ''); 
+
+      return skuList;
+    } catch (error: any) {
+      console.error('Error fetching SKUs:', error);
+      console.error('Error details:', {
+        message: error?.message,
+        details: error?.details,
+        hint: error?.hint,
+        code: error?.code,
+      });
+      throw new Error(`Failed to fetch SKUs: ${error?.message || 'Unknown error'}`);
+    }
+  };

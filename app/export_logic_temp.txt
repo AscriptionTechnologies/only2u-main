@@ -1,0 +1,228 @@
+  const exportSkusToCsv = async () => {
+    try {
+      setExportingSku(true);
+      setShowSkuExportMenu(false);
+
+      const skuList = await fetchAllSkus();
+
+      if (!skuList || skuList.length === 0) {
+        alert('No SKUs found to export.');
+        setExportingSku(false);
+        return;
+      }
+
+      // Helper function to escape CSV values
+      const escapeCsv = (value: any): string => {
+        if (value === null || value === undefined) return '';
+        const str = String(value);
+        if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+          return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+      };
+
+      // Group variants by product to create Shopify format
+      const productMap = new Map<string, typeof skuList>();
+      skuList.forEach(item => {
+        if (!productMap.has(item.productId)) {
+          productMap.set(item.productId, []);
+        }
+        productMap.get(item.productId)!.push(item);
+      });
+
+      // Shopify CSV headers (Matching User Template)
+      const headers = [
+        "Title",
+        "URL handle",
+        "Description",
+        "Vendor",
+        "Product category",
+        "Type",
+        "Tags",
+        "Published on online store",
+        "Status",
+        "SKU",
+        "Barcode",
+        "Option1 name",
+        "Option1 value",
+        "Option1 Linked To",
+        "Option2 name",
+        "Option2 value",
+        "Option2 Linked To",
+        "Option3 name",
+        "Option3 value",
+        "Option3 Linked To",
+        "Price",
+        "Compare-at price",
+        "Cost per item",
+        "Charge tax",
+        "Tax code",
+        "Unit price total measure",
+        "Unit price total measure unit",
+        "Unit price base measure",
+        "Unit price base measure unit",
+        "Inventory tracker",
+        "Inventory quantity",
+        "Continue selling when out of stock",
+        "Weight value (grams)",
+        "Weight unit for display",
+        "Requires shipping",
+        "Fulfillment service",
+        "Product image URL",
+        "Image position",
+        "Image alt text",
+        "Variant image URL",
+        "Gift card",
+        "SEO title",
+        "SEO description",
+        "Color (product.metafields.shopify.color-pattern)",
+        "Google Shopping / Google product category",
+        "Google Shopping / Gender",
+        "Google Shopping / Age group",
+        "Google Shopping / Manufacturer part number (MPN)",
+        "Google Shopping / Ad group name",
+        "Google Shopping / Ads labels",
+        "Google Shopping / Condition",
+        "Google Shopping / Custom product",
+        "Google Shopping / Custom label 0",
+        "Google Shopping / Custom label 1",
+        "Google Shopping / Custom label 2",
+        "Google Shopping / Custom label 3",
+        "Google Shopping / Custom label 4",
+        "HSN Code"
+      ];
+
+      const csvRows: string[] = [headers.join(',')];
+
+      // Process each product and its variants
+      productMap.forEach((variants, productId) => {
+        if (variants.length === 0) return;
+
+        const firstVariant = variants[0];
+        const handle = createHandle(firstVariant.productName);
+        const productName = firstVariant.productName;
+        const productDescription = firstVariant.productDescription || '';
+        const vendor = firstVariant.vendorName || '';
+        const category = firstVariant.categoryName || '';
+        // If active, 'Published on online store' is TRUE
+        const isPublished = firstVariant.isActive ? 'TRUE' : 'FALSE';
+        // Status can be Active or Draft
+        const status = firstVariant.isActive ? 'Active' : 'Draft';
+
+        // Determine option names based on available data
+        const hasSize = variants.some(v => v.sizeName);
+        const hasColor = variants.some(v => v.colorName);
+        const option1Name = hasSize ? 'Size' : (hasColor ? 'Color' : '');
+        const option2Name = (hasSize && hasColor) ? 'Color' : '';
+
+        // Track images to avoid duplicate positions for the same URL
+        const processedImages = new Set<string>();
+        let imagePositionCounter = 1;
+
+        // Create a row for each variant
+        variants.forEach((variant, index) => {
+          const isFirstRow = index === 0;
+          const option1Value = option1Name === 'Size' ? variant.sizeName : (option1Name === 'Color' ? variant.colorName : '');
+          const option2Value = option2Name === 'Color' ? variant.colorName : '';
+
+          let rowImageSrc = '';
+          let rowImagePos = '';
+          let rowImageAlt = '';
+
+          // Only declare the image as a "Product Image" (Src/Pos) if it hasn't been declared yet
+          if (variant.imageUrl && !processedImages.has(variant.imageUrl)) {
+            rowImageSrc = variant.imageUrl;
+            rowImagePos = String(imagePositionCounter++);
+            rowImageAlt = productName;
+            processedImages.add(variant.imageUrl);
+          }
+
+          // Match the columns exactly to the headers provided
+          // Only strict fields on first row, empty on others (except critical identity fields)
+          const row = [
+            escapeCsv(isFirstRow ? productName : ''), // Title (Only first row)
+            escapeCsv(handle), // URL handle (Required on all rows)
+            escapeCsv(isFirstRow ? productDescription : ''), // Description (Only first row)
+            escapeCsv(isFirstRow ? vendor : ''), // Vendor (Only first row)
+            '', // Product category
+            escapeCsv(isFirstRow ? category : ''), // Type (Only first row)
+            '', // Tags
+            escapeCsv(isFirstRow ? isPublished : ''), // Published on online store (Only first row)
+            escapeCsv(isFirstRow ? status : ''), // Status (Only first row)
+            escapeCsv(variant.sku), // SKU
+            '', // Barcode
+            escapeCsv(option1Name), // Option1 name
+            escapeCsv(option1Value), // Option1 value
+            '', // Option1 Linked To
+            escapeCsv(option2Name), // Option2 name
+            escapeCsv(option2Value), // Option2 value
+            '', // Option2 Linked To
+            '', // Option3 name
+            '', // Option3 value
+            '', // Option3 Linked To
+            escapeCsv(variant.price), // Price
+            escapeCsv(variant.mrpPrice), // Compare-at price
+            '', // Cost per item
+            'TRUE', // Charge tax
+            '', // Tax code
+            '', // Unit price total measure
+            '', // Unit price total measure unit
+            '', // Unit price base measure
+            '', // Unit price base measure unit
+            'shopify', // Inventory tracker
+            escapeCsv(variant.quantity), // Inventory quantity
+            'deny', // Continue selling when out of stock
+            '', // Weight value (grams)
+            'kg', // Weight unit for display
+            'TRUE', // Requires shipping
+            'manual', // Fulfillment service
+            escapeCsv(rowImageSrc), // Product image URL (Deduplicated)
+            escapeCsv(rowImagePos), // Image position (Deduplicated)
+            escapeCsv(rowImageAlt), // Image alt text
+            escapeCsv(variant.imageUrl), // Variant image URL (Can be repeated, references Src)
+            'FALSE', // Gift card
+            escapeCsv(isFirstRow ? productName : ''), // SEO title
+            escapeCsv(isFirstRow ? productDescription : ''), // SEO description
+            '', // Color (product.metafields.shopify.color-pattern)
+            '', // Google Shopping / Google product category
+            '', // Google Shopping / Gender
+            '', // Google Shopping / Age group
+            '', // Google Shopping / Manufacturer part number (MPN)
+            '', // Google Shopping / Ad group name
+            '', // Google Shopping / Ads labels
+            'new', // Google Shopping / Condition
+            'FALSE', // Google Shopping / Custom product
+            '', // Google Shopping / Custom label 0
+            '', // Google Shopping / Custom label 1
+            '', // Google Shopping / Custom label 2
+            '', // Google Shopping / Custom label 3
+            '', // Google Shopping / Custom label 4
+            escapeCsv(variant.hsnCode), // HSN Code
+          ];
+
+          csvRows.push(row.join(','));
+        });
+      });
+
+      const csvContent = csvRows.join('\n');
+
+      // Add BOM for Excel compatibility
+      const BOM = '\uFEFF';
+      const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `shopify-products-template-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error: any) {
+      console.error('Error exporting SKUs to CSV:', error);
+      const errorMessage = error?.message || 'Unknown error occurred';
+      console.error('Full error details:', error);
+      alert(`Failed to export SKUs: ${errorMessage}. Please check the console for details.`);
+    } finally {
+      setExportingSku(false);
+    }
+  };
