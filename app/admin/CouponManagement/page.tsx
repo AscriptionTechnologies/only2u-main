@@ -289,43 +289,26 @@ export default function CouponManagementPage() {
   }, [coupons, searchTerm, statusFilter]);
 
   const summaryCards = useMemo(() => {
-    const totalActive = coupons.filter((coupon) => coupon.is_active).length;
-    const totalScheduled = coupons.filter((coupon) => {
-      const now = new Date();
-      return (
-        coupon.is_active &&
-        coupon.start_date &&
-        new Date(coupon.start_date) > now
-      );
-    }).length;
-
-    const totalExpired = coupons.filter((coupon) => {
-      if (!coupon.end_date) return false;
-      return new Date(coupon.end_date) < new Date();
-    }).length;
-
+    const usedCouponsCount = coupons.filter((coupon) => (coupon.uses_count ?? 0) > 0).length;
+    const pendingCouponsCount = coupons.filter((coupon) => (coupon.uses_count ?? 0) === 0).length;
     const totalUses = coupons.reduce((sum, coupon) => sum + (coupon.uses_count ?? 0), 0);
+    const totalActive = coupons.filter((coupon) => coupon.is_active).length;
 
     return [
       {
-        title: "Active Coupons",
-        value: totalActive,
-        accent: "bg-green-100 text-green-700",
+        title: "Issued Coupons",
+        value: usedCouponsCount,
+        accent: "bg-blue-100 text-blue-700",
       },
       {
-        title: "Scheduled",
-        value: totalScheduled,
+        title: "Pending (Unused)",
+        value: pendingCouponsCount,
         accent: "bg-amber-100 text-amber-700",
       },
       {
-        title: "Expired / Inactive",
-        value: totalExpired + (coupons.length - totalActive - totalScheduled - totalExpired),
-        accent: "bg-gray-100 text-gray-600",
-      },
-      {
-        title: "Total Redemptions",
-        value: totalUses,
-        accent: "bg-[#F53F7A]/10 text-[#F53F7A]",
+        title: "Active Status",
+        value: totalActive,
+        accent: "bg-green-100 text-green-700",
       },
     ];
   }, [coupons]);
@@ -388,7 +371,7 @@ export default function CouponManagementPage() {
                 type="text"
                 value={formState.code}
                 onChange={(e) => handleFormChange("code", e.target.value.toUpperCase())}
-                    placeholder={editingCoupon ? editingCoupon.code : "Auto-generate"}
+                placeholder={editingCoupon ? editingCoupon.code : "Auto-generate"}
                 maxLength={20}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A]"
               />
@@ -535,11 +518,10 @@ export default function CouponManagementPage() {
               {submitting
                 ? "Saving..."
                 : editingCoupon
-                ? "Update Coupon"
-                : `Create Coupon${
-                    formState.code.trim()
-                      ? ` (${formState.code.trim().toUpperCase()})`
-                      : ""
+                  ? "Update Coupon"
+                  : `Create Coupon${formState.code.trim()
+                    ? ` (${formState.code.trim().toUpperCase()})`
+                    : ""
                   }`}
             </button>
           </div>
@@ -681,9 +663,8 @@ export default function CouponManagementPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
                         <button
                           onClick={() => toggleActiveStatus(coupon)}
-                          className={`text-sm ${
-                            coupon.is_active ? "text-amber-600 hover:text-amber-700" : "text-green-600 hover:text-green-700"
-                          }`}
+                          className={`text-sm ${coupon.is_active ? "text-amber-600 hover:text-amber-700" : "text-green-600 hover:text-green-700"
+                            }`}
                         >
                           {coupon.is_active ? "Deactivate" : "Activate"}
                         </button>

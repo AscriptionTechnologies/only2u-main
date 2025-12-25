@@ -2,6 +2,8 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { supabase } from "../../../lib/supabase";
 import { NextResponse } from "next/server";
 
+
+
 export async function POST(req: Request) {
     try {
         const { messages } = await req.json();
