@@ -131,6 +131,12 @@ const Sidebar = () => {
       path: "Settings",
     },
     {
+      name: "App Feedbacks",
+      icon: HandHeart,
+      link: "/admin/Feedback",
+      path: "Feedback",
+    },
+    {
       name: "Support Chat",
       icon: MessageCircle,
       link: "/admin/Support",
