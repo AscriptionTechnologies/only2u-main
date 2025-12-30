@@ -118,7 +118,7 @@ function ProductFormContent() {
   const [uploadingImages, setUploadingImages] = useState(false);
   const [uploadingVideos, setUploadingVideos] = useState(false);
   const [failedImages, setFailedImages] = useState<Set<number>>(new Set());
-  
+
   // Enhanced media management with size assignments
   type MediaWithSizes = {
     url: string;
@@ -128,7 +128,7 @@ function ProductFormContent() {
     images: MediaWithSizes[];
     videos: MediaWithSizes[];
   }>({ images: [], videos: [] });
-  
+
   // Modal state for size selection
   const [showSizeSelectionModal, setShowSizeSelectionModal] = useState(false);
   const [pendingMediaUrls, setPendingMediaUrls] = useState<string[]>([]);
@@ -462,10 +462,10 @@ function ProductFormContent() {
   // Generic URL cleaning and conversion function for images
   const cleanAndConvertUrl = (url: string): string => {
     if (!url || !url.trim()) return url;
-    
+
     // Clean the URL: remove extra spaces, newlines, etc.
     let cleanedUrl = url.trim().replace(/\s+/g, '');
-    
+
     // Check if it's a Google Drive sharing URL
     const driveMatch = cleanedUrl.match(/\/file\/d\/([a-zA-Z0-9-_]+)/);
     if (driveMatch) {
@@ -473,12 +473,12 @@ function ProductFormContent() {
       // Use the more reliable thumbnail format for images
       return `https://drive.google.com/thumbnail?id=${fileId}&sz=w1200`;
     }
-    
+
     // Check if it's already a direct Google Drive URL
     if (cleanedUrl.includes('drive.google.com/uc?export=view') || cleanedUrl.includes('drive.google.com/thumbnail')) {
       return cleanedUrl;
     }
-    
+
     // For any other URL, just return the cleaned version
     return cleanedUrl;
   };
@@ -486,10 +486,10 @@ function ProductFormContent() {
   // Video URL cleaning and conversion function
   const cleanAndConvertVideoUrl = (url: string): string => {
     if (!url || !url.trim()) return url;
-    
+
     // Clean the URL: remove extra spaces, newlines, etc.
     let cleanedUrl = url.trim().replace(/\s+/g, '');
-    
+
     // Check if it's a Google Drive sharing URL for video
     const driveMatch = cleanedUrl.match(/\/file\/d\/([a-zA-Z0-9-_]+)/);
     if (driveMatch) {
@@ -497,12 +497,12 @@ function ProductFormContent() {
       // Convert to direct video URL for Google Drive
       return `https://drive.google.com/uc?export=view&id=${fileId}`;
     }
-    
+
     // Check if it's already a direct Google Drive video URL
     if (cleanedUrl.includes('drive.google.com/uc?export=view')) {
       return cleanedUrl;
     }
-    
+
     // For any other URL, just return the cleaned version
     return cleanedUrl;
   };
@@ -517,19 +517,19 @@ function ProductFormContent() {
   const addVariantImageUrl = (colorId: string | null | undefined, sizeId: string) => {
     const key = `${colorId}-${sizeId}`;
     const imageUrl = variantImageUrls[key];
-    
+
     if (imageUrl && imageUrl.trim()) {
       // Clean and convert URL if needed
       const convertedUrl = cleanAndConvertUrl(imageUrl.trim());
-      
+
       console.log('Image URL Processing:');
       console.log('Original URL:', imageUrl.trim());
       console.log('Converted URL:', convertedUrl);
-      
+
       // Test if the image loads successfully
       const testImage = new Image();
       let imageLoaded = false;
-      
+
       // Set a timeout to prevent brief appearance
       const timeoutId = setTimeout(() => {
         if (!imageLoaded) {
@@ -538,16 +538,16 @@ function ProductFormContent() {
             const updatedVariants = prev.map((variant) =>
               variant.color_id === colorId && variant.size_id === sizeId
                 ? {
-                    ...variant,
-                    image_urls: variant.image_urls.slice(0, -1), // Remove the last added URL
-                  }
+                  ...variant,
+                  image_urls: variant.image_urls.slice(0, -1), // Remove the last added URL
+                }
                 : variant
             );
             return updatedVariants;
           });
         }
       }, 3000); // 3 second timeout
-      
+
       testImage.onload = () => {
         // Image loaded successfully, keep the converted URL
         imageLoaded = true;
@@ -565,30 +565,30 @@ function ProductFormContent() {
             `https://drive.google.com/thumbnail?id=${fileId}&sz=w600`,
             `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`
           ];
-          
+
           let currentIndex = 0;
-          
+
           const tryNextUrl = () => {
             if (currentIndex >= alternativeUrls.length) {
               // All alternatives failed, show error message
               console.log('❌ All Google Drive URL formats failed. The image may require authentication or be private.');
               alert('⚠️ Google Drive Image Error: The image appears to be private or requires authentication. Please make sure the image is set to "Anyone with the link can view" in Google Drive sharing settings.');
-              
+
               // Remove the failed URL from variants
               setVariants((prev) => {
                 const updatedVariants = prev.map((variant) =>
                   variant.color_id === colorId && variant.size_id === sizeId
                     ? {
-                        ...variant,
-                        image_urls: variant.image_urls.slice(0, -1), // Remove the last added URL
-                      }
+                      ...variant,
+                      image_urls: variant.image_urls.slice(0, -1), // Remove the last added URL
+                    }
                     : variant
                 );
                 return updatedVariants;
               });
               return;
             }
-            
+
             const altTestImage = new Image();
             altTestImage.onload = () => {
               // Update with working alternative URL
@@ -597,9 +597,9 @@ function ProductFormContent() {
                 const updatedVariants = prev.map((variant) =>
                   variant.color_id === colorId && variant.size_id === sizeId
                     ? {
-                        ...variant,
-                        image_urls: [...variant.image_urls.slice(0, -1), alternativeUrls[currentIndex]],
-                      }
+                      ...variant,
+                      image_urls: [...variant.image_urls.slice(0, -1), alternativeUrls[currentIndex]],
+                    }
                     : variant
                 );
                 return updatedVariants;
@@ -612,21 +612,21 @@ function ProductFormContent() {
             };
             altTestImage.src = alternativeUrls[currentIndex];
           };
-          
+
           tryNextUrl();
         } else {
           // Not a Google Drive URL, show generic error
           console.log('❌ Image failed to load. Please check if the URL is correct and the image is publicly accessible.');
           alert('⚠️ Image Error: The image failed to load. Please check if the URL is correct and the image is publicly accessible.');
-          
+
           // Remove the failed URL from variants
           setVariants((prev) => {
             const updatedVariants = prev.map((variant) =>
               variant.color_id === colorId && variant.size_id === sizeId
                 ? {
-                    ...variant,
-                    image_urls: variant.image_urls.slice(0, -1), // Remove the last added URL
-                  }
+                  ...variant,
+                  image_urls: variant.image_urls.slice(0, -1), // Remove the last added URL
+                }
                 : variant
             );
             return updatedVariants;
@@ -634,14 +634,14 @@ function ProductFormContent() {
         }
       };
       testImage.src = convertedUrl;
-      
+
       setVariants((prev) => {
         const updatedVariants = prev.map((variant) =>
           variant.color_id === colorId && variant.size_id === sizeId
             ? {
-                ...variant,
-                image_urls: [...variant.image_urls, convertedUrl],
-              }
+              ...variant,
+              image_urls: [...variant.image_urls, convertedUrl],
+            }
             : variant
         );
         return updatedVariants;
@@ -743,7 +743,7 @@ function ProductFormContent() {
       if (newProductId) {
         console.log("Processing variants for product:", newProductId);
         console.log("Current variants state:", variants);
-        
+
         if (productId) {
           // For existing products, update variants intelligently
           console.log("Editing existing product, fetching current variants...");
@@ -751,7 +751,7 @@ function ProductFormContent() {
             .from("product_variants")
             .select("id, color_id, size_id")
             .eq("product_id", newProductId);
-          
+
           if (existingVariants.error) {
             console.error("Error fetching existing variants:", existingVariants.error);
             return;
@@ -763,7 +763,7 @@ function ProductFormContent() {
             const key = `${variant.color_id || 'null'}-${variant.size_id}`;
             existingVariantsMap.set(key, variant.id);
           });
-          
+
           console.log("Existing variants in database:", existingVariants.data);
           console.log("Existing variants map:", Object.fromEntries(existingVariantsMap));
 
@@ -771,9 +771,9 @@ function ProductFormContent() {
           for (const variant of variants) {
             const key = `${variant.color_id || 'null'}-${variant.size_id}`;
             const existingVariantId = existingVariantsMap.get(key);
-            
+
             console.log(`Processing variant: ${key}, existing ID: ${existingVariantId}`);
-            
+
             const variantData = {
               product_id: newProductId,
               color_id: variant.color_id || null,
@@ -797,7 +797,7 @@ function ProductFormContent() {
                 .from("product_variants")
                 .update(variantData)
                 .eq("id", existingVariantId);
-              
+
               if (updateError) {
                 console.error("Error updating variant:", updateError);
               } else {
@@ -812,7 +812,7 @@ function ProductFormContent() {
                   ...variantData,
                   created_at: new Date().toISOString(),
                 });
-              
+
               if (insertError) {
                 console.error("Error inserting variant:", insertError);
               } else {
@@ -834,7 +834,7 @@ function ProductFormContent() {
               .from("product_variants")
               .delete()
               .in("id", variantIdsToDelete);
-            
+
             if (deleteError) {
               console.error("Error deleting old variants:", deleteError);
             }
@@ -872,7 +872,7 @@ function ProductFormContent() {
       if (newProductId && reviews.length > 0) {
         console.log("[Save Reviews] Starting to save reviews. Total reviews:", reviews.length);
         console.log("[Save Reviews] Reviews data:", reviews);
-        
+
         // Delete existing reviews
         await supabase
           .from("product_reviews")
@@ -906,7 +906,7 @@ function ProductFormContent() {
       }
 
       console.log("Product saved successfully!");
-      
+
       // Navigate back to appropriate page
       if (categoryId) {
         router.push(`/admin/CategoryProducts/${categoryId}`);
@@ -1057,11 +1057,11 @@ function ProductFormContent() {
     // Apply media to existing variants with matching sizes, or create new variants
     setVariants((prev) => {
       const updatedVariants = [...prev];
-      
+
       selectedSizesForMedia.forEach(sizeId => {
         // Check if variants exist for this size
         const existingVariants = updatedVariants.filter(v => v.size_id === sizeId);
-        
+
         if (existingVariants.length > 0) {
           // Update existing variants
           existingVariants.forEach(variant => {
@@ -1098,7 +1098,7 @@ function ProductFormContent() {
           updatedVariants.push(newVariant);
         }
       });
-      
+
       return updatedVariants;
     });
 
@@ -1126,7 +1126,7 @@ function ProductFormContent() {
     setVariants((prev) =>
       prev.map((variant) => ({
         ...variant,
-        image_urls: mediaType === 'image' 
+        image_urls: mediaType === 'image'
           ? variant.image_urls.filter(url => url !== mediaUrl)
           : variant.image_urls,
         video_urls: mediaType === 'video'
@@ -1139,7 +1139,7 @@ function ProductFormContent() {
   const handleSharedImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
-    
+
     setUploadingImages(true);
     const urls: string[] = [];
     for (let i = 0; i < files.length; i++) {
@@ -1160,7 +1160,7 @@ function ProductFormContent() {
       setSelectedSizesForMedia([]); // Reset selection
       setShowSizeSelectionModal(true);
     }
-    
+
     // Reset file input
     event.target.value = '';
   };
@@ -1168,7 +1168,7 @@ function ProductFormContent() {
   const handleSharedVideoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
-    
+
     setUploadingVideos(true);
     const urls: string[] = [];
     for (let i = 0; i < files.length; i++) {
@@ -1189,7 +1189,7 @@ function ProductFormContent() {
       setSelectedSizesForMedia([]); // Reset selection
       setShowSizeSelectionModal(true);
     }
-    
+
     // Reset file input
     event.target.value = '';
   };
@@ -1203,12 +1203,12 @@ function ProductFormContent() {
     setVariants((prev) =>
       prev.map((variant) =>
         variant.color_id === colorId && variant.size_id === sizeId
-          ? { 
-              ...variant, 
-              [field]: ['price', 'mrp_price', 'rsp_price', 'cost_price', 'discount_percentage'].includes(field) 
-                ? Math.round(value) 
-                : value 
-            }
+          ? {
+            ...variant,
+            [field]: ['price', 'mrp_price', 'rsp_price', 'cost_price', 'discount_percentage'].includes(field)
+              ? Math.round(value)
+              : value
+          }
           : variant
       )
     );
@@ -1256,11 +1256,11 @@ function ProductFormContent() {
       prev.map((variant) =>
         variant.color_id === colorId && variant.size_id === sizeId
           ? {
-              ...variant,
-              image_urls: variant.image_urls.filter(
-                (_, index) => index !== imageIndex
-              ),
-            }
+            ...variant,
+            image_urls: variant.image_urls.filter(
+              (_, index) => index !== imageIndex
+            ),
+          }
           : variant
       )
     );
@@ -1308,11 +1308,11 @@ function ProductFormContent() {
       prev.map((variant) =>
         variant.color_id === colorId && variant.size_id === sizeId
           ? {
-              ...variant,
-              video_urls: variant.video_urls.filter(
-                (_, index) => index !== videoIndex
-              ),
-            }
+            ...variant,
+            video_urls: variant.video_urls.filter(
+              (_, index) => index !== videoIndex
+            ),
+          }
           : variant
       )
     );
@@ -1321,21 +1321,21 @@ function ProductFormContent() {
   const addVariantVideoUrl = (colorId: string | null | undefined, sizeId: string) => {
     const key = `${colorId}-${sizeId}`;
     const videoUrl = variantVideoUrls[key];
-    
+
     if (videoUrl && videoUrl.trim()) {
       const convertedUrl = cleanAndConvertVideoUrl(videoUrl.trim());
-      
+
       console.log('Video URL Processing:');
       console.log('Original URL:', videoUrl.trim());
       console.log('Converted URL:', convertedUrl);
-      
+
       setVariants((prev) => {
         const updatedVariants = prev.map((variant) =>
           variant.color_id === colorId && variant.size_id === sizeId
             ? {
-                ...variant,
-                video_urls: [...variant.video_urls, convertedUrl],
-              }
+              ...variant,
+              video_urls: [...variant.video_urls, convertedUrl],
+            }
             : variant
         );
         return updatedVariants;
@@ -1408,7 +1408,7 @@ function ProductFormContent() {
       try {
         const text = e.target?.result as string;
         const lines = text.split('\n').filter(line => line.trim());
-        
+
         if (lines.length === 0) {
           alert('File is empty');
           return;
@@ -1436,7 +1436,7 @@ function ProductFormContent() {
           if (!line) continue;
 
           const columns = line.split(',').map(c => c.trim());
-          
+
           const name = columns[nameIndex]?.replace(/^["']|["']$/g, '') || '';
           const ratingStr = columns[ratingIndex]?.replace(/^["']|["']$/g, '') || '';
           const rating = parseFloat(ratingStr);
@@ -1456,7 +1456,7 @@ function ProductFormContent() {
           const comment = commentIndex !== -1 ? (columns[commentIndex]?.replace(/^["']|["']$/g, '') || '') : '';
           const dateStr = dateIndex !== -1 ? (columns[dateIndex]?.replace(/^["']|["']$/g, '') || '') : '';
           const verifiedStr = verifiedIndex !== -1 ? (columns[verifiedIndex]?.replace(/^["']|["']$/g, '').toLowerCase() || 'false') : 'false';
-          
+
           // Parse date or use current date
           let reviewDate = new Date().toISOString().split("T")[0];
           if (dateStr) {
@@ -1508,7 +1508,7 @@ function ProductFormContent() {
     if (field === 'profile_image_url') {
       finalValue = cleanAndConvertUrl(value);
     }
-    
+
     setReviews((prev) => {
       const updatedReviews = prev.map((review, i) =>
         i === index ? { ...review, [field]: finalValue } : review
@@ -1578,13 +1578,13 @@ function ProductFormContent() {
       const file = files[i];
       console.log(`[Review Image Upload] Uploading file ${i + 1}/${files.length}: ${file.name}`);
       const result = await uploadFile(file, "reviewmedia", "image");
-      
+
       if (result.error) {
         console.error(`[Review Image Upload] Error uploading ${file.name}:`, result.error);
         alert(`Error uploading ${file.name}: ${result.error}`);
         continue;
       }
-      
+
       console.log(`[Review Image Upload] Successfully uploaded ${file.name}, URL:`, result.url);
       uploadedUrls.push(result.url);
     }
@@ -1594,8 +1594,8 @@ function ProductFormContent() {
     if (uploadedUrls.length > 0) {
       setReviews((prev) => {
         const updated = prev.map((review, i) =>
-          i === index 
-            ? { ...review, review_images: [...(review.review_images || []), ...uploadedUrls] } 
+          i === index
+            ? { ...review, review_images: [...(review.review_images || []), ...uploadedUrls] }
             : review
         );
         console.log(`[Review Image Upload] Updated reviews state for review #${index}:`, updated[index]);
@@ -1605,7 +1605,7 @@ function ProductFormContent() {
     } else {
       alert('No images were uploaded. Please try again.');
     }
-    
+
     setUploadingReviewImages(false);
     // Reset file input
     event.target.value = '';
@@ -1627,13 +1627,13 @@ function ProductFormContent() {
       const file = files[i];
       console.log(`[Review Video Upload] Uploading file ${i + 1}/${files.length}: ${file.name}`);
       const result = await uploadFile(file, "reviewmedia", "video");
-      
+
       if (result.error) {
         console.error(`[Review Video Upload] Error uploading ${file.name}:`, result.error);
         alert(`Error uploading ${file.name}: ${result.error}`);
         continue;
       }
-      
+
       console.log(`[Review Video Upload] Successfully uploaded ${file.name}, URL:`, result.url);
       uploadedUrls.push(result.url);
     }
@@ -1643,8 +1643,8 @@ function ProductFormContent() {
     if (uploadedUrls.length > 0) {
       setReviews((prev) => {
         const updated = prev.map((review, i) =>
-          i === index 
-            ? { ...review, review_videos: [...(review.review_videos || []), ...uploadedUrls] } 
+          i === index
+            ? { ...review, review_videos: [...(review.review_videos || []), ...uploadedUrls] }
             : review
         );
         console.log(`[Review Video Upload] Updated reviews state for review #${index}:`, updated[index]);
@@ -1654,7 +1654,7 @@ function ProductFormContent() {
     } else {
       alert('No videos were uploaded. Please try again.');
     }
-    
+
     setUploadingVideos(false);
     // Reset file input
     event.target.value = '';
@@ -1664,8 +1664,8 @@ function ProductFormContent() {
   const removeReviewMediaImage = (reviewIndex: number, mediaIndex: number) => {
     setReviews((prev) =>
       prev.map((review, i) =>
-        i === reviewIndex 
-          ? { ...review, review_images: review.review_images?.filter((_, idx) => idx !== mediaIndex) || [] } 
+        i === reviewIndex
+          ? { ...review, review_images: review.review_images?.filter((_, idx) => idx !== mediaIndex) || [] }
           : review
       )
     );
@@ -1675,8 +1675,8 @@ function ProductFormContent() {
   const removeReviewMediaVideo = (reviewIndex: number, mediaIndex: number) => {
     setReviews((prev) =>
       prev.map((review, i) =>
-        i === reviewIndex 
-          ? { ...review, review_videos: review.review_videos?.filter((_, idx) => idx !== mediaIndex) || [] } 
+        i === reviewIndex
+          ? { ...review, review_videos: review.review_videos?.filter((_, idx) => idx !== mediaIndex) || [] }
           : review
       )
     );
@@ -1810,39 +1810,39 @@ function ProductFormContent() {
                   <p className="text-sm text-gray-600 mb-4">
                     Upload images and videos, then select which sizes should use them. All available sizes will be shown for selection.
                   </p>
-                  
+
                   {/* Upload Buttons */}
                   <div className="flex gap-3 mb-4">
                     <label className="flex items-center gap-2 px-4 py-2 bg-[#F53F7A] text-white rounded-lg hover:bg-[#F53F7A]/90 cursor-pointer transition-colors">
-                              <input
-                                ref={sharedImageInputRef}
-                                type="file"
-                                accept="image/*"
-                                multiple
-                                onChange={handleSharedImageUpload}
-                                className="hidden"
-                              />
+                      <input
+                        ref={sharedImageInputRef}
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={handleSharedImageUpload}
+                        className="hidden"
+                      />
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
                       {uploadingImages ? 'Uploading...' : 'Upload Images'}
-                            </label>
-                    
+                    </label>
+
                     <label className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 cursor-pointer transition-colors">
-                              <input
-                                ref={sharedVideoInputRef}
-                                type="file"
-                                accept="video/*"
-                                multiple
-                                onChange={handleSharedVideoUpload}
-                                className="hidden"
-                              />
+                      <input
+                        ref={sharedVideoInputRef}
+                        type="file"
+                        accept="video/*"
+                        multiple
+                        onChange={handleSharedVideoUpload}
+                        className="hidden"
+                      />
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                       </svg>
                       {uploadingVideos ? 'Uploading...' : 'Upload Videos'}
-                            </label>
-                          </div>
+                    </label>
+                  </div>
 
                   {/* Media Library Display */}
                   {(mediaLibrary.images.length > 0 || mediaLibrary.videos.length > 0) && (
@@ -1866,8 +1866,8 @@ function ProductFormContent() {
                                         </span>
                                       );
                                     })}
-                        </div>
-                      </div>
+                                  </div>
+                                </div>
                                 <button
                                   type="button"
                                   onClick={() => removeMediaFromLibrary(media.url, 'image')}
@@ -1878,7 +1878,7 @@ function ProductFormContent() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                   </svg>
                                 </button>
-                    </div>
+                              </div>
                             ))}
                           </div>
                         </div>
@@ -1886,7 +1886,7 @@ function ProductFormContent() {
 
                       {/* Videos Section */}
                       {mediaLibrary.videos.length > 0 && (
-                    <div>
+                        <div>
                           <h4 className="text-sm font-semibold text-gray-700 mb-2">Videos in Library</h4>
                           <div className="space-y-2">
                             {mediaLibrary.videos.map((media, idx) => (
@@ -1905,19 +1905,19 @@ function ProductFormContent() {
                                     })}
                                   </div>
                                 </div>
-                      <button
-                        type="button"
+                                <button
+                                  type="button"
                                   onClick={() => removeMediaFromLibrary(media.url, 'video')}
                                   className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
                                   title="Remove from library"
-                      >
+                                >
                                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                   </svg>
-                      </button>
-                    </div>
+                                </button>
+                              </div>
                             ))}
-                  </div>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -2037,9 +2037,9 @@ function ProductFormContent() {
                               e.target.value === ""
                                 ? null
                                 : (e.target.value as
-                                    | "trending"
-                                    | "best_seller"
-                                    | null),
+                                  | "trending"
+                                  | "best_seller"
+                                  | null),
                           })
                         }
                         className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
@@ -2070,11 +2070,10 @@ function ProductFormContent() {
                           <button
                             key={color.id}
                             type="button"
-                            className={`w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all ${
-                              selectedColors.includes(color.id)
+                            className={`w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all ${selectedColors.includes(color.id)
                                 ? "border-[#F53F7A] ring-2 ring-[#F53F7A]"
                                 : "border-gray-300 hover:border-gray-400"
-                            }`}
+                              }`}
                             style={{ backgroundColor: color.hex_code }}
                             onClick={() => handleColorSelection(color.id)}
                           >
@@ -2130,11 +2129,10 @@ function ProductFormContent() {
                           <button
                             key={size.id}
                             type="button"
-                            className={`px-4 py-2 rounded-lg border transition-all ${
-                              selectedSizes.includes(size.id)
+                            className={`px-4 py-2 rounded-lg border transition-all ${selectedSizes.includes(size.id)
                                 ? "bg-[#F53F7A] text-white border-[#F53F7A]"
                                 : "bg-white text-gray-700 border-gray-300 hover:border-gray-400"
-                            }`}
+                              }`}
                             onClick={() => handleSizeSelection(size.id)}
                           >
                             {size.name}
@@ -2158,44 +2156,44 @@ function ProductFormContent() {
                             // Sort variants by size order
                             const sizeA = sizes.find((s) => s.id === a.size_id);
                             const sizeB = sizes.find((s) => s.id === b.size_id);
-                            
+
                             if (!sizeA || !sizeB) return 0;
-                            
+
                             const nameA = sizeA.name.trim();
                             const nameB = sizeB.name.trim();
-                            
+
                             // Comprehensive size ordering
                             const sizeOrder = [
-                              'XXXS', 'XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', 
+                              'XXXS', 'XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL',
                               '2XL', '3XL', '4XL', '5XL', '6XL',
                               'ONE SIZE', 'FREE SIZE', 'OS', 'UNIVERSAL'
                             ];
-                            
+
                             // Check if both are in the predefined size order
                             const upperA = nameA.toUpperCase();
                             const upperB = nameB.toUpperCase();
                             const indexA = sizeOrder.indexOf(upperA);
                             const indexB = sizeOrder.indexOf(upperB);
-                            
+
                             if (indexA !== -1 && indexB !== -1) {
                               return indexA - indexB;
                             }
                             if (indexA !== -1) return -1; // A is a standard size, B is not
                             if (indexB !== -1) return 1;  // B is a standard size, A is not
-                            
+
                             // Check if both are purely numeric (shoe sizes, etc.)
                             const numA = parseFloat(nameA);
                             const numB = parseFloat(nameB);
-                            
+
                             if (!isNaN(numA) && !isNaN(numB)) {
                               return numA - numB;
                             }
-                            
+
                             // Check for numeric with suffix (e.g., "28W", "32L")
                             const numericPrefixRegex = /^(\d+\.?\d*)/;
                             const matchA = nameA.match(numericPrefixRegex);
                             const matchB = nameB.match(numericPrefixRegex);
-                            
+
                             if (matchA && matchB) {
                               const prefixA = parseFloat(matchA[1]);
                               const prefixB = parseFloat(matchB[1]);
@@ -2205,332 +2203,342 @@ function ProductFormContent() {
                               // If numeric parts are equal, compare the rest
                               return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
                             }
-                            
+
                             // Fallback to natural sort (handles mixed alphanumeric)
-                            return nameA.localeCompare(nameB, undefined, { 
-                              numeric: true, 
-                              sensitivity: 'base' 
+                            return nameA.localeCompare(nameB, undefined, {
+                              numeric: true,
+                              sensitivity: 'base'
                             });
                           })
                           .map((variant) => {
-                          const color = colors.find(
-                            (c) => c.id === variant.color_id
-                          );
-                          const size = sizes.find(
-                            (s) => s.id === variant.size_id
-                          );
+                            const color = colors.find(
+                              (c) => c.id === variant.color_id
+                            );
+                            const size = sizes.find(
+                              (s) => s.id === variant.size_id
+                            );
 
-                          return (
-                            <div
-                              key={`${variant.color_id}-${variant.size_id}`}
-                              className="border border-gray-200 rounded-lg p-3 relative"
-                            >
-                              <div className="flex items-center gap-3 overflow-x-auto">
-                                {/* Color/Size Display */}
-                                <div className="flex items-center gap-1 flex-shrink-0">
-                                  {variant.color_id ? (
-                                    <>
-                                      <div
-                                        className="w-5 h-5 rounded-full border-2 border-gray-300"
-                                        style={{
-                                          backgroundColor: colors.find(c => c.id === variant.color_id)?.hex_code || "#ccc",
-                                        }}
-                                      ></div>
+                            return (
+                              <div
+                                key={`${variant.color_id}-${variant.size_id}`}
+                                className="border border-gray-200 rounded-lg p-3 relative"
+                              >
+                                <div className="flex items-center gap-3 overflow-x-auto">
+                                  {/* Color/Size Display */}
+                                  <div className="flex items-center gap-1 flex-shrink-0">
+                                    {variant.color_id ? (
+                                      <>
+                                        <div
+                                          className="w-5 h-5 rounded-full border-2 border-gray-300"
+                                          style={{
+                                            backgroundColor: colors.find(c => c.id === variant.color_id)?.hex_code || "#ccc",
+                                          }}
+                                        ></div>
+                                        <span className="text-lg font-medium whitespace-nowrap">
+                                          {size?.name}
+                                        </span>
+                                      </>
+                                    ) : (
                                       <span className="text-lg font-medium whitespace-nowrap">
                                         {size?.name}
                                       </span>
-                                    </>
-                                  ) : (
-                                    <span className="text-lg font-medium whitespace-nowrap">
-                                      {size?.name}
-                                    </span>
-                                  )}
-                                </div>
+                                    )}
+                                  </div>
 
-                                {/* Cross Icon */}
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    // Remove this variant by filtering it out
-                                    setVariants((prev) =>
-                                      prev.filter(
+                                  {/* Cross Icon */}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      // Remove this variant by filtering it out
+                                      setVariants((prev) =>
+                                        prev.filter(
+                                          (v) =>
+                                            !(
+                                              v.color_id === variant.color_id &&
+                                              v.size_id === variant.size_id
+                                            )
+                                        )
+                                      );
+                                      // Also remove from selected colors/sizes if no other variants use them
+                                      const remainingVariants = variants.filter(
                                         (v) =>
                                           !(
                                             v.color_id === variant.color_id &&
                                             v.size_id === variant.size_id
                                           )
-                                      )
-                                    );
-                                    // Also remove from selected colors/sizes if no other variants use them
-                                    const remainingVariants = variants.filter(
-                                      (v) =>
-                                        !(
-                                          v.color_id === variant.color_id &&
-                                          v.size_id === variant.size_id
-                                        )
-                                    );
-                                    const usedColors = [
-                                      ...new Set(
-                                        remainingVariants.map((v) => v.color_id).filter((id): id is string => Boolean(id))
-                                      ),
-                                    ];
-                                    const usedSizes = [
-                                      ...new Set(
-                                        remainingVariants.map((v) => v.size_id)
-                                      ),
-                                    ];
-                                    setSelectedColors(usedColors);
-                                    setSelectedSizes(usedSizes);
-                                  }}
-                                  className="w-5 h-5 absolute -top-2 -right-2 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors flex-shrink-0"
-                                >
-                                  <svg
-                                    className="w-3 h-3"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
+                                      );
+                                      const usedColors = [
+                                        ...new Set(
+                                          remainingVariants.map((v) => v.color_id).filter((id): id is string => Boolean(id))
+                                        ),
+                                      ];
+                                      const usedSizes = [
+                                        ...new Set(
+                                          remainingVariants.map((v) => v.size_id)
+                                        ),
+                                      ];
+                                      setSelectedColors(usedColors);
+                                      setSelectedSizes(usedSizes);
+                                    }}
+                                    className="w-5 h-5 absolute -top-2 -right-2 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors flex-shrink-0"
                                   >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M6 18L18 6M6 6l12 12"
-                                    />
-                                  </svg>
-                                </button>
+                                    <svg
+                                      className="w-3 h-3"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M6 18L18 6M6 6l12 12"
+                                      />
+                                    </svg>
+                                  </button>
 
-                                {/* All inputs, images, and videos in one horizontal row */}
-                                <div className="flex gap-3 min-w-max">
-                                  {/* Quantity */}
-                                  <div className="w-24 flex-shrink-0">
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      Qty <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                      type="number"
-                                      value={variant.quantity}
-                                      onChange={(e) =>
-                                        updateVariant(
-                                          variant.color_id,
-                                          variant.size_id,
-                                          "quantity",
-                                          parseInt(e.target.value) || 0
-                                        )
-                                      }
-                                      min="0"
-                                      className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
-                                    />
-                                  </div>
+                                  {/* All inputs, images, and videos in one horizontal row */}
+                                  <div className="flex gap-3 min-w-max">
+                                    {/* Quantity */}
+                                    <div className="w-24 flex-shrink-0">
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        Qty <span className="text-red-500">*</span>
+                                      </label>
+                                      <input
+                                        type="number"
+                                        inputMode="numeric"
+                                        value={variant.quantity === 0 ? '' : variant.quantity}
+                                        onChange={(e) =>
+                                          updateVariant(
+                                            variant.color_id,
+                                            variant.size_id,
+                                            "quantity",
+                                            parseInt(e.target.value) || 0
+                                          )
+                                        }
+                                        min="0"
+                                        placeholder="0"
+                                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
+                                      />
+                                    </div>
 
-                                  {/* SKU */}
-                                  <div className="w-24 flex-shrink-0">
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      SKU <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                      type="text"
-                                      value={variant.sku}
-                                      onChange={(e) =>
-                                        updateVariant(
-                                          variant.color_id,
-                                          variant.size_id,
-                                          "sku",
-                                          e.target.value
-                                        )
-                                      }
-                                      className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
-                                      placeholder="SKU"
-                                    />
-                                  </div>
+                                    {/* SKU */}
+                                    <div className="w-24 flex-shrink-0">
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        SKU <span className="text-red-500">*</span>
+                                      </label>
+                                      <input
+                                        type="text"
+                                        value={variant.sku}
+                                        onChange={(e) =>
+                                          updateVariant(
+                                            variant.color_id,
+                                            variant.size_id,
+                                            "sku",
+                                            e.target.value
+                                          )
+                                        }
+                                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
+                                        placeholder="SKU"
+                                      />
+                                    </div>
 
-                                  {/* MRP */}
-                                  <div className="w-20 flex-shrink-0">
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      MRP <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                      type="number"
-                                      value={Math.round(variant.mrp_price)}
-                                      onChange={(e) => {
-                                        const mrp = parseFloat(e.target.value) || 0;
-                                        updateVariant(
-                                          variant.color_id,
-                                          variant.size_id,
-                                          "mrp_price",
-                                          mrp
-                                        );
-                                        const discount = calculateDiscountPercentage(mrp, variant.rsp_price);
-                                        updateVariant(
-                                          variant.color_id,
-                                          variant.size_id,
-                                          "discount_percentage",
-                                          discount
-                                        );
-                                      }}
-                                      step="1"
-                                      min="0"
-                                      className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
-                                    />
-                                  </div>
+                                    {/* MRP */}
+                                    <div className="w-20 flex-shrink-0">
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        MRP <span className="text-red-500">*</span>
+                                      </label>
+                                      <input
+                                        type="number"
+                                        inputMode="numeric"
+                                        value={variant.mrp_price === 0 ? '' : Math.round(variant.mrp_price)}
+                                        onChange={(e) => {
+                                          const mrp = parseFloat(e.target.value) || 0;
+                                          updateVariant(
+                                            variant.color_id,
+                                            variant.size_id,
+                                            "mrp_price",
+                                            mrp
+                                          );
+                                          const discount = calculateDiscountPercentage(mrp, variant.rsp_price);
+                                          updateVariant(
+                                            variant.color_id,
+                                            variant.size_id,
+                                            "discount_percentage",
+                                            discount
+                                          );
+                                        }}
+                                        step="1"
+                                        min="0"
+                                        placeholder="0"
+                                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
+                                      />
+                                    </div>
 
-                                  {/* RSP */}
-                                  <div className="w-20 flex-shrink-0">
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      RSP <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                      type="number"
-                                      value={Math.round(variant.rsp_price)}
-                                      onChange={(e) => {
-                                        const rsp = parseFloat(e.target.value) || 0;
-                                        updateVariant(
-                                          variant.color_id,
-                                          variant.size_id,
-                                          "rsp_price",
-                                          rsp
-                                        );
-                                        updateVariant(
-                                          variant.color_id,
-                                          variant.size_id,
-                                          "price",
-                                          rsp
-                                        );
-                                        const discount = calculateDiscountPercentage(variant.mrp_price, rsp);
-                                        updateVariant(
-                                          variant.color_id,
-                                          variant.size_id,
-                                          "discount_percentage",
-                                          discount
-                                        );
-                                      }}
-                                      step="1"
-                                      min="0"
-                                      className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
-                                    />
-                                  </div>
+                                    {/* RSP */}
+                                    <div className="w-20 flex-shrink-0">
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        RSP <span className="text-red-500">*</span>
+                                      </label>
+                                      <input
+                                        type="number"
+                                        inputMode="numeric"
+                                        value={variant.rsp_price === 0 ? '' : Math.round(variant.rsp_price)}
+                                        onChange={(e) => {
+                                          const rsp = parseFloat(e.target.value) || 0;
+                                          updateVariant(
+                                            variant.color_id,
+                                            variant.size_id,
+                                            "rsp_price",
+                                            rsp
+                                          );
+                                          updateVariant(
+                                            variant.color_id,
+                                            variant.size_id,
+                                            "price",
+                                            rsp
+                                          );
+                                          const discount = calculateDiscountPercentage(variant.mrp_price, rsp);
+                                          updateVariant(
+                                            variant.color_id,
+                                            variant.size_id,
+                                            "discount_percentage",
+                                            discount
+                                          );
+                                        }}
+                                        step="1"
+                                        min="0"
+                                        placeholder="0"
+                                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
+                                      />
+                                    </div>
 
-                                  {/* Cost Price */}
-                                  <div className="w-20 flex-shrink-0">
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      Cost
-                                    </label>
-                                    <input
-                                      type="number"
-                                      value={Math.round(variant.cost_price)}
-                                      onChange={(e) =>
-                                        updateVariant(
-                                          variant.color_id,
-                                          variant.size_id,
-                                          "cost_price",
-                                          parseFloat(e.target.value) || 0
-                                        )
-                                      }
-                                      step="1"
-                                      min="0"
-                                      className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
-                                    />
-                                  </div>
+                                    {/* Cost Price */}
+                                    <div className="w-20 flex-shrink-0">
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        Cost
+                                      </label>
+                                      <input
+                                        type="number"
+                                        inputMode="numeric"
+                                        value={variant.cost_price === 0 ? '' : Math.round(variant.cost_price)}
+                                        onChange={(e) =>
+                                          updateVariant(
+                                            variant.color_id,
+                                            variant.size_id,
+                                            "cost_price",
+                                            parseFloat(e.target.value) || 0
+                                          )
+                                        }
+                                        step="1"
+                                        min="0"
+                                        placeholder="0"
+                                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
+                                      />
+                                    </div>
 
-                                  {/* Discount */}
-                                  <div className="w-20 flex-shrink-0">
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      Disc %
-                                    </label>
-                                    <input
-                                      type="number"
-                                      value={Math.round(variant.discount_percentage)}
-                                      onChange={(e) =>
-                                        updateVariant(
-                                          variant.color_id,
-                                          variant.size_id,
-                                          "discount_percentage",
-                                          parseFloat(e.target.value) || 0
-                                        )
-                                      }
-                                      step="1"
-                                      min="0"
-                                      max="100"
-                                      className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
-                                      readOnly
-                                    />
-                                  </div>
+                                    {/* Discount */}
+                                    <div className="w-20 flex-shrink-0">
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        Disc %
+                                      </label>
+                                      <input
+                                        type="number"
+                                        inputMode="numeric"
+                                        value={variant.discount_percentage === 0 ? '' : Math.round(variant.discount_percentage)}
+                                        onChange={(e) =>
+                                          updateVariant(
+                                            variant.color_id,
+                                            variant.size_id,
+                                            "discount_percentage",
+                                            parseFloat(e.target.value) || 0
+                                          )
+                                        }
+                                        step="1"
+                                        min="0"
+                                        max="100"
+                                        placeholder="0"
+                                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
+                                        readOnly
+                                      />
+                                    </div>
 
-                                  {/* Variant Images (display + per-variant optional upload) */}
-                                  <div className="w-80 flex-shrink-0">
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      Images
-                                    </label>
-                                    <div className="flex gap-2 items-start">
-                                      <div className="flex gap-1 overflow-x-auto">
-                                        {variant.image_urls.map((url, idx) => (
-                                          <div key={idx} className="relative flex-shrink-0">
-                                            <img
-                                              src={url}
-                                              alt={color ? `${color.name} ${size?.name}` : `${size?.name}`}
-                                              className="h-12 w-12 rounded object-cover border"
+                                    {/* Variant Images (display + per-variant optional upload) */}
+                                    <div className="w-80 flex-shrink-0">
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        Images
+                                      </label>
+                                      <div className="flex gap-2 items-start">
+                                        <div className="flex gap-1 overflow-x-auto">
+                                          {variant.image_urls.map((url, idx) => (
+                                            <div key={idx} className="relative flex-shrink-0">
+                                              <img
+                                                src={url}
+                                                alt={color ? `${color.name} ${size?.name}` : `${size?.name}`}
+                                                className="h-12 w-12 rounded object-cover border"
+                                              />
+                                              <button
+                                                onClick={() => removeVariantImage(variant.color_id, variant.size_id, idx)}
+                                                className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs hover:bg-red-600"
+                                              >
+                                                ×
+                                              </button>
+                                            </div>
+                                          ))}
+                                          <label className="h-12 w-12 flex-shrink-0 flex items-center justify-center border-2 border-dashed border-gray-300 rounded text-gray-400 hover:border-[#F53F7A] hover:text-[#F53F7A] cursor-pointer">
+                                            <input
+                                              type="file"
+                                              accept="image/*"
+                                              multiple
+                                              onChange={(e) => handleVariantImageUpload(variant.color_id, variant.size_id, e)}
+                                              className="hidden"
                                             />
-                                            <button
-                                              onClick={() => removeVariantImage(variant.color_id, variant.size_id, idx)}
-                                              className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs hover:bg-red-600"
-                                            >
-                                              ×
-                                            </button>
-                                          </div>
-                                        ))}
-                                        <label className="h-12 w-12 flex-shrink-0 flex items-center justify-center border-2 border-dashed border-gray-300 rounded text-gray-400 hover:border-[#F53F7A] hover:text-[#F53F7A] cursor-pointer">
-                                          <input
-                                            type="file"
-                                            accept="image/*"
-                                            multiple
-                                            onChange={(e) => handleVariantImageUpload(variant.color_id, variant.size_id, e)}
-                                            className="hidden"
-                                          />
-                                          {uploadingImages ? "..." : "+"}
-                                        </label>
+                                            {uploadingImages ? "..." : "+"}
+                                          </label>
+                                        </div>
                                       </div>
                                     </div>
-                                  </div>
 
-                                  {/* Variant Videos (display + per-variant optional upload) */}
-                                  <div className="w-80 flex-shrink-0">
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                                      Videos
-                                    </label>
-                                    <div className="flex gap-2 items-start">
-                                      <div className="flex gap-1 overflow-x-auto">
-                                        {variant.video_urls.map((url, idx) => (
-                                          <div key={idx} className="relative flex-shrink-0">
-                                            <video
-                                              src={url}
-                                              className="h-12 w-12 rounded object-cover border"
-                                              controls
+                                    {/* Variant Videos (display + per-variant optional upload) */}
+                                    <div className="w-80 flex-shrink-0">
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        Videos
+                                      </label>
+                                      <div className="flex gap-2 items-start">
+                                        <div className="flex gap-1 overflow-x-auto">
+                                          {variant.video_urls.map((url, idx) => (
+                                            <div key={idx} className="relative flex-shrink-0">
+                                              <video
+                                                src={url}
+                                                className="h-12 w-12 rounded object-cover border"
+                                                controls
+                                              />
+                                              <button
+                                                onClick={() => removeVariantVideo(variant.color_id, variant.size_id, idx)}
+                                                className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs hover:bg-red-600"
+                                              >
+                                                ×
+                                              </button>
+                                            </div>
+                                          ))}
+                                          <label className="h-12 w-12 flex-shrink-0 flex items-center justify-center border-2 border-dashed border-gray-300 rounded text-gray-400 hover:border-[#F53F7A] hover:text-[#F53F7A] cursor-pointer">
+                                            <input
+                                              type="file"
+                                              accept="video/*"
+                                              multiple
+                                              onChange={(e) => handleVariantVideoUpload(variant.color_id, variant.size_id, e)}
+                                              className="hidden"
                                             />
-                                            <button
-                                              onClick={() => removeVariantVideo(variant.color_id, variant.size_id, idx)}
-                                              className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs hover:bg-red-600"
-                                            >
-                                              ×
-                                            </button>
-                                          </div>
-                                        ))}
-                                        <label className="h-12 w-12 flex-shrink-0 flex items-center justify-center border-2 border-dashed border-gray-300 rounded text-gray-400 hover:border-[#F53F7A] hover:text-[#F53F7A] cursor-pointer">
-                                          <input
-                                            type="file"
-                                            accept="video/*"
-                                            multiple
-                                            onChange={(e) => handleVariantVideoUpload(variant.color_id, variant.size_id, e)}
-                                            className="hidden"
-                                          />
-                                          {uploadingVideos ? "..." : "+"}
-                                        </label>
+                                            {uploadingVideos ? "..." : "+"}
+                                          </label>
+                                        </div>
                                       </div>
                                     </div>
                                   </div>
                                 </div>
                               </div>
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
                       </div>
                     </div>
                   )}
@@ -2841,13 +2849,13 @@ function ProductFormContent() {
                         </svg>
                         Template
                       </a>
-                    <button
-                      type="button"
-                      onClick={() => setShowReviewsSection(!showReviewsSection)}
-                      className="text-sm text-[#F53F7A] hover:text-[#F53F7A]/80 font-medium"
-                    >
-                      {showReviewsSection ? "Hide Reviews" : "Show Reviews"}
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowReviewsSection(!showReviewsSection)}
+                        className="text-sm text-[#F53F7A] hover:text-[#F53F7A]/80 font-medium"
+                      >
+                        {showReviewsSection ? "Hide Reviews" : "Show Reviews"}
+                      </button>
                     </div>
                   </div>
 
@@ -2856,7 +2864,7 @@ function ProductFormContent() {
                       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                         <p className="text-sm text-blue-800 font-medium mb-1">📄 CSV Format Guide:</p>
                         <p className="text-xs text-blue-700">
-                          <strong>Required columns:</strong> name, rating (1-5) | 
+                          <strong>Required columns:</strong> name, rating (1-5) |
                           <strong> Optional:</strong> comment, date (YYYY-MM-DD), verified (true/false)
                         </p>
                         <p className="text-xs text-blue-600 mt-1">
@@ -2891,15 +2899,15 @@ function ProductFormContent() {
                               className="border border-gray-200 rounded-lg p-4 bg-white hover:shadow-sm transition-shadow relative"
                             >
                               {/* Delete Button */}
-                                  <button
-                                    type="button"
-                                    onClick={() => removeReview(index)}
+                              <button
+                                type="button"
+                                onClick={() => removeReview(index)}
                                 className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-md z-10"
-                                  >
+                              >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                  </button>
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
 
                               {/* Horizontal Layout - All in One Row */}
                               <div className="flex items-start gap-4">
@@ -2908,17 +2916,16 @@ function ProductFormContent() {
                                   <span className="text-sm font-bold text-gray-900 bg-gray-100 px-2 py-1 rounded">
                                     #{index + 1}
                                   </span>
-                                <button
-                                  type="button"
-                                  onClick={() => toggleReviewVerification(index)}
-                                    className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
-                                    review.is_verified
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleReviewVerification(index)}
+                                    className={`px-2 py-1 text-xs font-medium rounded transition-colors ${review.is_verified
                                         ? "bg-green-100 text-green-700"
-                                      : "bg-gray-100 text-gray-600"
-                                  }`}
-                                >
-                                  {review.is_verified ? "✓" : "○"}
-                                </button>
+                                        : "bg-gray-100 text-gray-600"
+                                      }`}
+                                  >
+                                    {review.is_verified ? "✓" : "○"}
+                                  </button>
                                 </div>
 
                                 {/* Profile Picture */}
@@ -2975,38 +2982,37 @@ function ProductFormContent() {
                                       className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#F53F7A]"
                                     />
                                   </div>
-                                  </div>
+                                </div>
 
-                                  {/* Rating */}
+                                {/* Rating */}
                                 <div className="flex flex-col gap-1 flex-shrink-0">
                                   <label className="text-xs font-medium text-gray-700">Rating</label>
-                                    <div className="flex items-center gap-1">
-                                      {[1, 2, 3, 4, 5].map((star) => (
-                                        <button
-                                          key={star}
-                                          type="button"
-                                          onClick={() => updateReview(index, "rating", star)}
-                                        className={`text-xl hover:scale-110 transition-transform ${
-                                            star <= review.rating ? "text-yellow-400" : "text-gray-300"
+                                  <div className="flex items-center gap-1">
+                                    {[1, 2, 3, 4, 5].map((star) => (
+                                      <button
+                                        key={star}
+                                        type="button"
+                                        onClick={() => updateReview(index, "rating", star)}
+                                        className={`text-xl hover:scale-110 transition-transform ${star <= review.rating ? "text-yellow-400" : "text-gray-300"
                                           }`}
-                                        >
-                                          ★
-                                        </button>
-                                      ))}
-                                    </div>
+                                      >
+                                        ★
+                                      </button>
+                                    ))}
                                   </div>
+                                </div>
 
-                                  {/* Comment */}
+                                {/* Comment */}
                                 <div className="flex-1 min-w-[200px]">
                                   <label className="text-xs font-medium text-gray-700 block mb-1">Comment</label>
                                   <textarea
-                                      value={review.comment}
-                                      onChange={(e) => updateReview(index, "comment", e.target.value)}
+                                    value={review.comment}
+                                    onChange={(e) => updateReview(index, "comment", e.target.value)}
                                     rows={3}
                                     className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#F53F7A] resize-none"
                                     placeholder="Review comment..."
-                                    />
-                                  </div>
+                                  />
+                                </div>
 
                                 {/* Review Images */}
                                 <div className="flex flex-col gap-1">
@@ -3018,28 +3024,28 @@ function ProductFormContent() {
                                           src={url}
                                           alt={`Review ${index + 1} Image ${imgIdx + 1}`}
                                           className="h-14 w-14 rounded object-cover border border-gray-300 hover:border-[#F53F7A] transition-colors"
-                                          />
-                                          <button
-                                            type="button"
+                                        />
+                                        <button
+                                          type="button"
                                           onClick={() => removeReviewMediaImage(index, imgIdx)}
-                                            className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs hover:bg-red-600"
-                                          >
-                                            ×
-                                          </button>
-                                        </div>
+                                          className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs hover:bg-red-600"
+                                        >
+                                          ×
+                                        </button>
+                                      </div>
                                     ))}
                                     <label className="h-14 w-14 flex items-center justify-center border border-dashed border-gray-300 rounded text-gray-400 hover:border-[#F53F7A] hover:text-[#F53F7A] cursor-pointer transition-colors">
-                                          <input
-                                            type="file"
-                                            accept="image/*"
+                                      <input
+                                        type="file"
+                                        accept="image/*"
                                         multiple
                                         onChange={(e) => handleReviewMediaImageUpload(index, e)}
-                                            className="hidden"
-                                          />
+                                        className="hidden"
+                                      />
                                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                                       </svg>
-                                        </label>
+                                    </label>
                                   </div>
                                 </div>
 
@@ -3064,7 +3070,7 @@ function ProductFormContent() {
                                       </div>
                                     ))}
                                     <label className="h-14 w-14 flex items-center justify-center border border-dashed border-gray-300 rounded text-gray-400 hover:border-purple-600 hover:text-purple-600 cursor-pointer transition-colors">
-                                        <input
+                                      <input
                                         type="file"
                                         accept="video/*"
                                         multiple
@@ -3075,16 +3081,16 @@ function ProductFormContent() {
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                                       </svg>
                                     </label>
-                                      </div>
-                                    </div>
                                   </div>
                                 </div>
-                          ))}
                               </div>
-                      )}
                             </div>
-                  )}
+                          ))}
                         </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -3144,7 +3150,7 @@ function ProductFormContent() {
                 <p className="text-sm font-medium text-gray-700 mb-3">
                   Select which sizes should use this media:
                 </p>
-                
+
                 {/* Select All / Deselect All */}
                 <div className="flex gap-2 mb-3">
                   <button
@@ -3177,39 +3183,39 @@ function ProductFormContent() {
                       .sort((a, b) => {
                         const nameA = a.name.trim();
                         const nameB = b.name.trim();
-                        
+
                         // Comprehensive size ordering
                         const sizeOrder = [
-                          'XXXS', 'XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', 
+                          'XXXS', 'XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL',
                           '2XL', '3XL', '4XL', '5XL', '6XL',
                           'ONE SIZE', 'FREE SIZE', 'OS', 'UNIVERSAL'
                         ];
-                        
+
                         // Check if both are in the predefined size order
                         const upperA = nameA.toUpperCase();
                         const upperB = nameB.toUpperCase();
                         const indexA = sizeOrder.indexOf(upperA);
                         const indexB = sizeOrder.indexOf(upperB);
-                        
+
                         if (indexA !== -1 && indexB !== -1) {
                           return indexA - indexB;
                         }
                         if (indexA !== -1) return -1; // A is a standard size, B is not
                         if (indexB !== -1) return 1;  // B is a standard size, A is not
-                        
+
                         // Check if both are purely numeric (shoe sizes, etc.)
                         const numA = parseFloat(nameA);
                         const numB = parseFloat(nameB);
-                        
+
                         if (!isNaN(numA) && !isNaN(numB)) {
                           return numA - numB;
                         }
-                        
+
                         // Check for numeric with suffix (e.g., "28W", "32L")
                         const numericPrefixRegex = /^(\d+\.?\d*)/;
                         const matchA = nameA.match(numericPrefixRegex);
                         const matchB = nameB.match(numericPrefixRegex);
-                        
+
                         if (matchA && matchB) {
                           const prefixA = parseFloat(matchA[1]);
                           const prefixB = parseFloat(matchB[1]);
@@ -3219,46 +3225,45 @@ function ProductFormContent() {
                           // If numeric parts are equal, compare the rest
                           return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
                         }
-                        
+
                         // Fallback to natural sort (handles mixed alphanumeric)
-                        return nameA.localeCompare(nameB, undefined, { 
-                          numeric: true, 
-                          sensitivity: 'base' 
+                        return nameA.localeCompare(nameB, undefined, {
+                          numeric: true,
+                          sensitivity: 'base'
                         });
                       })
                       .map((size) => {
-                      const isSelected = selectedSizesForMedia.includes(size.id);
-                      
-                      return (
-                        <label
-                          key={size.id}
-                          className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all ${
-                            isSelected
-                              ? 'bg-[#F53F7A] text-white'
-                              : 'bg-white hover:bg-gray-50'
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedSizesForMedia([...selectedSizesForMedia, size.id]);
-                              } else {
-                                setSelectedSizesForMedia(selectedSizesForMedia.filter(id => id !== size.id));
-                              }
-                            }}
-                            className="h-5 w-5 rounded border-gray-300 text-[#F53F7A] focus:ring-[#F53F7A]"
-                          />
-                          <span className="font-medium">{size.name}</span>
-                          {selectedColors.length > 0 && (
-                            <span className={`text-xs ${isSelected ? 'text-white/80' : 'text-gray-500'}`}>
-                              (All colors)
-                            </span>
-                          )}
-                        </label>
-                      );
-                    })
+                        const isSelected = selectedSizesForMedia.includes(size.id);
+
+                        return (
+                          <label
+                            key={size.id}
+                            className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all ${isSelected
+                                ? 'bg-[#F53F7A] text-white'
+                                : 'bg-white hover:bg-gray-50'
+                              }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedSizesForMedia([...selectedSizesForMedia, size.id]);
+                                } else {
+                                  setSelectedSizesForMedia(selectedSizesForMedia.filter(id => id !== size.id));
+                                }
+                              }}
+                              className="h-5 w-5 rounded border-gray-300 text-[#F53F7A] focus:ring-[#F53F7A]"
+                            />
+                            <span className="font-medium">{size.name}</span>
+                            {selectedColors.length > 0 && (
+                              <span className={`text-xs ${isSelected ? 'text-white/80' : 'text-gray-500'}`}>
+                                (All colors)
+                              </span>
+                            )}
+                          </label>
+                        );
+                      })
                   )}
                 </div>
               </div>
@@ -3269,7 +3274,7 @@ function ProductFormContent() {
                   <p className="text-sm text-green-800">
                     <span className="font-semibold">{selectedSizesForMedia.length}</span> size(s) selected
                   </p>
-            </div>
+                </div>
               )}
 
               {/* Action Buttons */}
@@ -3299,9 +3304,9 @@ function ProductFormContent() {
                   </svg>
                   Assign to Selected Sizes
                 </button>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
         </div>
       )}
 
