@@ -126,12 +126,14 @@ function getStateFromPincode(pincode: string): string {
 
 // Parse address string to extract components
 function parseAddress(address: string) {
-  if (!address) return { name: '', address: '', state: '', pincode: '', stateCode: '' };
+  if (!address) return { name: '', address: '', fullAddress: '', state: '', pincode: '', stateCode: '' };
 
   const lines = address.split(',').map(s => s.trim());
   const name = lines[0] || '';
   const pincodeMatch = address.match(/\b\d{6}\b/);
   const pincode = pincodeMatch ? pincodeMatch[0] : '';
+  // Store the full original address for display purposes
+  const fullAddress = address;
 
   // Try to extract state (usually second to last or last)
   let state = '';
@@ -247,7 +249,7 @@ function parseAddress(address: string) {
 
   const addressLines = lines.slice(1).join(', ');
 
-  return { name, address: addressLines, state, pincode, stateCode };
+  return { name, address: addressLines, fullAddress, state, pincode, stateCode };
 }
 
 export async function generateOrderPdf(
@@ -641,10 +643,10 @@ export async function generateOrderPdf(
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     let billingTextY = addressBoxY + 20;
-    doc.text(billingAddress.name || order.user?.name || 'N/A', billingX + 5, billingTextY);
-    billingTextY += 10;
 
-    const billingAddressLines = doc.splitTextToSize(billingAddress.address || order.billing_address || 'N/A', addressBoxWidth - 10);
+    // Display the full billing address (includes name, street, city, state, pincode)
+    const billingAddressText = billingAddress.fullAddress || order.billing_address || 'N/A';
+    const billingAddressLines = doc.splitTextToSize(billingAddressText, addressBoxWidth - 10);
     billingAddressLines.forEach((line: string) => {
       doc.text(line, billingX + 5, billingTextY);
       billingTextY += 9;
@@ -671,10 +673,10 @@ export async function generateOrderPdf(
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     let shippingTextY = addressBoxY + 20;
-    doc.text(shippingAddress.name || order.user?.name || 'N/A', shippingX + 5, shippingTextY);
-    shippingTextY += 10;
 
-    const shippingAddressLines = doc.splitTextToSize(shippingAddress.address || order.shipping_address || 'N/A', addressBoxWidth - 10);
+    // Display the full shipping address (includes name, street, city, state, pincode)
+    const shippingAddressText = shippingAddress.fullAddress || order.shipping_address || 'N/A';
+    const shippingAddressLines = doc.splitTextToSize(shippingAddressText, addressBoxWidth - 10);
     shippingAddressLines.forEach((line: string) => {
       doc.text(line, shippingX + 5, shippingTextY);
       shippingTextY += 9;
@@ -755,10 +757,10 @@ export async function generateOrderPdf(
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     let billedToTextY = billedToBoxY + 20;
-    doc.text(billingAddress.name || order.user?.name || 'N/A', marginLeft + 5, billedToTextY);
-    billedToTextY += 10;
 
-    const billedToAddressLines = doc.splitTextToSize(billingAddress.address || order.billing_address || 'N/A', billedToBoxWidth - 10);
+    // Display the full billing address (includes name, street, city, state, pincode)
+    const billedToAddressText = billingAddress.fullAddress || order.billing_address || 'N/A';
+    const billedToAddressLines = doc.splitTextToSize(billedToAddressText, billedToBoxWidth - 10);
     billedToAddressLines.forEach((line: string) => {
       doc.text(line, marginLeft + 5, billedToTextY);
       billedToTextY += 9;
@@ -802,10 +804,10 @@ export async function generateOrderPdf(
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     let billingTextY = addressBoxY + 20;
-    doc.text(billingAddress.name || order.user?.name || 'N/A', billingX + 5, billingTextY);
-    billingTextY += 10;
 
-    const billingAddressLines = doc.splitTextToSize(billingAddress.address || order.billing_address || 'N/A', addressBoxWidth - 10);
+    // Display the full billing address (includes name, street, city, state, pincode)
+    const billingAddressText = billingAddress.fullAddress || order.billing_address || 'N/A';
+    const billingAddressLines = doc.splitTextToSize(billingAddressText, addressBoxWidth - 10);
     billingAddressLines.forEach((line: string) => {
       doc.text(line, billingX + 5, billingTextY);
       billingTextY += 9;
@@ -1642,8 +1644,8 @@ export async function generateReturnInvoicePdf(returnOrder: OrderReturn) {
 
   // Parse addresses from original order
   const originalOrder = returnOrder.order;
-  const billingAddress = originalOrder ? parseAddress(originalOrder.billing_address || '') : { name: '', address: '', state: '', pincode: '', stateCode: '' };
-  const shippingAddress = originalOrder ? parseAddress(originalOrder.shipping_address || '') : { name: '', address: '', state: '', pincode: '', stateCode: '' };
+  const billingAddress = originalOrder ? parseAddress(originalOrder.billing_address || '') : { name: '', address: '', fullAddress: '', state: '', pincode: '', stateCode: '' };
+  const shippingAddress = originalOrder ? parseAddress(originalOrder.shipping_address || '') : { name: '', address: '', fullAddress: '', state: '', pincode: '', stateCode: '' };
 
   const buyerStateCode = shippingAddress.stateCode || billingAddress.stateCode || '';
   let finalBuyerStateCode = buyerStateCode;
@@ -1845,11 +1847,9 @@ export async function generateReturnInvoicePdf(returnOrder: OrderReturn) {
   let sellerTextY = sellerBoxY + 20;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
-  const returnedByName = shippingAddress.name || billingAddress.name || returnOrder.user?.name || 'Customer';
-  doc.text(returnedByName, marginLeft + 5, sellerTextY);
-  sellerTextY += 10;
 
-  const returnedByAddress = shippingAddress.address || billingAddress.address || originalOrder?.shipping_address || originalOrder?.billing_address || 'N/A';
+  // Display the full address for the returned by customer (includes name, street, city, state, pincode)
+  const returnedByAddress = shippingAddress.fullAddress || billingAddress.fullAddress || originalOrder?.shipping_address || originalOrder?.billing_address || 'N/A';
   const returnedByAddressLines = doc.splitTextToSize(returnedByAddress, sellerBoxWidth - 10);
   returnedByAddressLines.forEach((line: string) => {
     doc.text(line, marginLeft + 5, sellerTextY);
