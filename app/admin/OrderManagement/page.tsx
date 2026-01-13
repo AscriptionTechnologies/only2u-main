@@ -146,13 +146,10 @@ const OrderManagementPage = () => {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      // Fetch orders with user information
+      // Fetch orders - orders table has customer info directly (customer_name, customer_email, customer_phone)
       const { data: ordersData, error: ordersError } = await supabase
         .from("orders")
-        .select(`
-          *,
-          user:users(name, email, phone)
-        `)
+        .select("*")
         .order("created_at", { ascending: false });
 
       if (ordersError) {
@@ -180,7 +177,7 @@ const OrderManagementPage = () => {
       }
 
       // Combine orders with their items and enrich with tax/HSN data
-      const ordersWithItems = (ordersData || []).map((order: Order) => {
+      const ordersWithItems = (ordersData || []).map((order: any) => {
         const items = (orderItemsData || []).filter(
           (item: any) => item.order_id === order.id
         ).map((item: any) => ({
@@ -189,9 +186,16 @@ const OrderManagementPage = () => {
           tax_type: item.product?.tax_type || null,
           tax_rate: item.product?.tax_rate || null,
         }));
+
         return {
           ...order,
           order_items: items,
+          // Manually construct user object since we're using flat columns
+          user: {
+            name: order.customer_name,
+            email: order.customer_email,
+            phone: order.customer_phone
+          }
         };
       });
 
@@ -211,7 +215,7 @@ const OrderManagementPage = () => {
         .from("customer_draft_orders")
         .select(`
           *,
-          user:users(name, email, phone)
+          user:users!customer_draft_orders_user_id_fkey(name, email, phone)
         `)
         .order("created_at", { ascending: false });
 
@@ -253,10 +257,7 @@ const OrderManagementPage = () => {
         .from("order_returns")
         .select(`
           *,
-          order:orders(
-            *,
-            user:users(name, email, phone)
-          )
+          order:orders(*)
         `)
         .order("created_at", { ascending: false });
 
@@ -277,13 +278,27 @@ const OrderManagementPage = () => {
       }
 
       // Combine return orders with their items and user info
-      const returnsWithItems = (returnsData || []).map((returnOrder: any) => ({
-        ...returnOrder,
-        return_items: (returnItemsData || []).filter(
-          (item: ReturnItem) => item.return_id === returnOrder.id
-        ),
-        user: returnOrder.order?.user || null,
-      }));
+      const returnsWithItems = (returnsData || []).map((returnOrder: any) => {
+        const orderUser = returnOrder.order ? {
+          name: returnOrder.order.customer_name,
+          email: returnOrder.order.customer_email,
+          phone: returnOrder.order.customer_phone
+        } : null;
+
+        const enrichedOrder = returnOrder.order ? {
+          ...returnOrder.order,
+          user: orderUser
+        } : null;
+
+        return {
+          ...returnOrder,
+          return_items: (returnItemsData || []).filter(
+            (item: ReturnItem) => item.return_id === returnOrder.id
+          ),
+          order: enrichedOrder,
+          user: orderUser,
+        };
+      });
 
       setReturnOrders(returnsWithItems);
     } catch (error) {
@@ -309,7 +324,6 @@ const OrderManagementPage = () => {
           .from("orders")
           .select(`
             *,
-            user:users(name, email, phone),
             order_items:order_items(
               *,
               product:products(hsn_code)
@@ -322,7 +336,14 @@ const OrderManagementPage = () => {
           toast.error("Failed to fetch original order details");
           return;
         }
-        orderData = data;
+        orderData = {
+          ...data,
+          user: {
+            name: data.customer_name,
+            email: data.customer_email,
+            phone: data.customer_phone
+          }
+        };
       }
 
       // Prepare return order with all data
@@ -761,11 +782,11 @@ const OrderManagementPage = () => {
       }
 
       toast.success('Draft order approved and converted to regular order!');
-      
+
       // Refresh both lists
       await fetchDraftOrders();
       await fetchOrders();
-      
+
       // Switch to regular orders view
       setOrderView('regular');
     } catch (error) {
@@ -777,10 +798,10 @@ const OrderManagementPage = () => {
   };
 
   const handleRejectDraftOrder = async (draftOrderId: string) => {
-    const reason = typeof window !== 'undefined' 
+    const reason = typeof window !== 'undefined'
       ? window.prompt("Enter rejection reason (optional):")
       : null;
-    
+
     if (reason === null) return; // User cancelled
 
     setRejectingOrder(draftOrderId);
@@ -851,7 +872,7 @@ const OrderManagementPage = () => {
 
   const ViewDraftDetailsModal = ({ draftOrder, onClose }: { draftOrder: DraftOrder; onClose: () => void }) => {
     if (!draftOrder) return null;
-    
+
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
         <div className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
@@ -861,19 +882,18 @@ const OrderManagementPage = () => {
               DRAFT ORDER
             </span>
           </div>
-          
+
           {/* Order Information */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div>
               <h3 className="font-semibold text-lg mb-3">Order Information</h3>
               <div className="space-y-2 text-sm">
                 <p><strong>Order Number:</strong> {draftOrder.order_number}</p>
-                <p><strong>Status:</strong> 
-                  <span className={`ml-2 px-2 py-1 text-xs rounded-full ${
-                    draftOrder.status === 'approved' ? 'bg-green-100 text-green-800' :
+                <p><strong>Status:</strong>
+                  <span className={`ml-2 px-2 py-1 text-xs rounded-full ${draftOrder.status === 'approved' ? 'bg-green-100 text-green-800' :
                     draftOrder.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                    'bg-amber-100 text-amber-800'
-                  }`}>
+                      'bg-amber-100 text-amber-800'
+                    }`}>
                     {draftOrder.status}
                   </span>
                 </p>
@@ -883,7 +903,7 @@ const OrderManagementPage = () => {
                 <p><strong>Created:</strong> {new Date(draftOrder.created_at).toLocaleString()}</p>
               </div>
             </div>
-            
+
             <div>
               <h3 className="font-semibold text-lg mb-3">Customer Information</h3>
               <div className="space-y-2 text-sm">
@@ -928,8 +948,8 @@ const OrderManagementPage = () => {
                       <td className="px-4 py-2 whitespace-nowrap">
                         <div className="flex items-center">
                           {item.product_image && (
-                            <img 
-                              src={item.product_image} 
+                            <img
+                              src={item.product_image}
                               alt={item.product_name}
                               className="h-10 w-10 rounded object-cover mr-3"
                             />
@@ -969,21 +989,21 @@ const OrderManagementPage = () => {
           <div className="flex justify-end gap-2">
             {draftOrder.status === 'draft' && (
               <>
-                <button 
+                <button
                   onClick={() => {
                     handleRejectDraftOrder(draftOrder.id);
                     onClose();
-                  }} 
+                  }}
                   className="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition"
                   disabled={rejectingOrder === draftOrder.id}
                 >
                   {rejectingOrder === draftOrder.id ? 'Rejecting...' : 'Reject Order'}
                 </button>
-                <button 
+                <button
                   onClick={() => {
                     handleApproveDraftOrder(draftOrder.id);
                     onClose();
-                  }} 
+                  }}
                   className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition"
                   disabled={approvingOrder === draftOrder.id}
                 >
@@ -991,8 +1011,8 @@ const OrderManagementPage = () => {
                 </button>
               </>
             )}
-            <button 
-              onClick={onClose} 
+            <button
+              onClick={onClose}
               className="bg-gray-400 text-white px-4 py-2 rounded-md hover:bg-gray-500 transition"
             >
               Close
@@ -1005,24 +1025,23 @@ const OrderManagementPage = () => {
 
   const ViewDetailsModal = ({ order, onClose }: { order: Order; onClose: () => void }) => {
     if (!order) return null;
-    
+
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
         <div className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
           <h2 className="text-xl font-bold mb-4">Order Details</h2>
-          
+
           {/* Order Information */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div>
               <h3 className="font-semibold text-lg mb-3">Order Information</h3>
               <div className="space-y-2 text-sm">
                 <p><strong>Order Number:</strong> {order.order_number}</p>
-                <p><strong>Status:</strong> 
-                  <span className={`ml-2 px-2 py-1 text-xs rounded-full ${
-                    order.status === 'approved' ? 'bg-green-100 text-green-800' :
+                <p><strong>Status:</strong>
+                  <span className={`ml-2 px-2 py-1 text-xs rounded-full ${order.status === 'approved' ? 'bg-green-100 text-green-800' :
                     order.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                    'bg-yellow-100 text-yellow-800'
-                  }`}>
+                      'bg-yellow-100 text-yellow-800'
+                    }`}>
                     {order.status}
                   </span>
                 </p>
@@ -1032,7 +1051,7 @@ const OrderManagementPage = () => {
                 <p><strong>Created:</strong> {new Date(order.created_at).toLocaleDateString()}</p>
               </div>
             </div>
-            
+
             <div>
               <h3 className="font-semibold text-lg mb-3">Customer Information</h3>
               <div className="space-y-2 text-sm">
@@ -1077,8 +1096,8 @@ const OrderManagementPage = () => {
                       <td className="px-4 py-2 whitespace-nowrap">
                         <div className="flex items-center">
                           {item.product_image && (
-                            <img 
-                              src={item.product_image} 
+                            <img
+                              src={item.product_image}
                               alt={item.product_name}
                               className="h-10 w-10 rounded object-cover mr-3"
                             />
@@ -1108,11 +1127,11 @@ const OrderManagementPage = () => {
           )}
 
           <div className="flex justify-end gap-2">
-            <button 
+            <button
               onClick={async () => {
                 // Ensure order_items are loaded before generating PDF
                 let orderWithItems = { ...order };
-                
+
                 if (!order.order_items || order.order_items.length === 0) {
                   toast.warning('Loading order items...');
                   // Fetch order items for this specific order
@@ -1127,12 +1146,12 @@ const OrderManagementPage = () => {
                       )
                     `)
                     .eq("order_id", order.id);
-                  
+
                   if (error) {
                     toast.error('Failed to load order items');
                     return;
                   }
-                  
+
                   // Enrich items with tax/HSN data
                   const enrichedItems = (orderItems || []).map((item: any) => ({
                     ...item,
@@ -1140,7 +1159,7 @@ const OrderManagementPage = () => {
                     tax_type: item.product?.tax_type || null,
                     tax_rate: item.product?.tax_rate || null,
                   }));
-                  
+
                   // Create new order object with items
                   orderWithItems = {
                     ...order,
@@ -1153,22 +1172,22 @@ const OrderManagementPage = () => {
             >
               Download PDF
             </button>
-            <button 
-              onClick={() => handleReject(order.id)} 
+            <button
+              onClick={() => handleReject(order.id)}
               className="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition"
               disabled={order.status === 'rejected'}
             >
               Reject
             </button>
-            <button 
-              onClick={() => handleApprove(order.id)} 
+            <button
+              onClick={() => handleApprove(order.id)}
               className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition"
               disabled={order.status === 'approved'}
             >
               Approve
             </button>
-            <button 
-              onClick={onClose} 
+            <button
+              onClick={onClose}
               className="bg-gray-400 text-white px-4 py-2 rounded-md hover:bg-gray-500 transition"
             >
               Close
@@ -1196,11 +1215,10 @@ const OrderManagementPage = () => {
           <button
             onClick={handleExport}
             disabled={exporting || currentOrders.length === 0}
-            className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
-              exporting || currentOrders.length === 0
-                ? "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed"
-                : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300"
-            }`}
+            className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${exporting || currentOrders.length === 0
+              ? "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed"
+              : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300"
+              }`}
           >
             {exporting ? (
               <>
@@ -1244,8 +1262,8 @@ const OrderManagementPage = () => {
             {orderView === "draft"
               ? `${draftOrders.filter((o) => o.status === "draft").length} pending draft orders`
               : orderView === "returns"
-              ? `${returnOrders.length} return orders`
-              : `${orders.length} total orders`}
+                ? `${returnOrders.length} return orders`
+                : `${orders.length} total orders`}
           </span>
         </div>
       </div>
@@ -1256,11 +1274,10 @@ const OrderManagementPage = () => {
           <nav className="-mb-px flex space-x-8">
             <button
               onClick={() => setOrderView('draft')}
-              className={`${
-                orderView === 'draft'
-                  ? 'border-[#F53F7A] text-[#F53F7A]'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-2`}
+              className={`${orderView === 'draft'
+                ? 'border-[#F53F7A] text-[#F53F7A]'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-2`}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -1274,11 +1291,10 @@ const OrderManagementPage = () => {
             </button>
             <button
               onClick={() => setOrderView('regular')}
-              className={`${
-                orderView === 'regular'
-                  ? 'border-[#F53F7A] text-[#F53F7A]'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-2`}
+              className={`${orderView === 'regular'
+                ? 'border-[#F53F7A] text-[#F53F7A]'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-2`}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -1292,11 +1308,10 @@ const OrderManagementPage = () => {
             </button>
             <button
               onClick={() => setOrderView('returns')}
-              className={`${
-                orderView === 'returns'
-                  ? 'border-[#F53F7A] text-[#F53F7A]'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-2`}
+              className={`${orderView === 'returns'
+                ? 'border-[#F53F7A] text-[#F53F7A]'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-2`}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -1359,11 +1374,10 @@ const OrderManagementPage = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">₹{draftOrder.total_amount}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          draftOrder.status === 'approved' ? 'bg-green-100 text-green-800' :
+                        <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${draftOrder.status === 'approved' ? 'bg-green-100 text-green-800' :
                           draftOrder.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                          'bg-amber-100 text-amber-800'
-                        }`}>
+                            'bg-amber-100 text-amber-800'
+                          }`}>
                           {draftOrder.status}
                         </span>
                       </td>
@@ -1425,61 +1439,60 @@ const OrderManagementPage = () => {
       {/* Regular Orders Table */}
       {orderView === 'regular' && (
         <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order Number</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Amount</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {loading ? (
-                <tr><td colSpan={7} className="text-center py-8 text-gray-400">Loading...</td></tr>
-              ) : orders.length === 0 ? (
-                <tr><td colSpan={7} className="text-center py-8 text-gray-400">No orders found.</td></tr>
-              ) : (
-                orders.map((order) => (
-                  <tr key={order.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{order.order_number}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{order.user?.name || "N/A"}</div>
-                        <div className="text-sm text-gray-500">{order.user?.email || "N/A"}</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">₹{order.total_amount}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        order.status === 'approved' ? 'bg-green-100 text-green-800' :
-                        order.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                        'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {order.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.payment_status}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(order.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-3">
-                        <button
-                          onClick={async () => {
-                            // Ensure order_items are loaded before generating PDF
-                            let orderWithItems = { ...order };
-                            
-                            if (!order.order_items || order.order_items.length === 0) {
-                              toast.warning('Loading order items...');
-                              // Fetch order items for this specific order
-                              const { data: orderItems, error } = await supabase
-                                .from("order_items")
-                                .select(`
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order Number</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Amount</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {loading ? (
+                  <tr><td colSpan={7} className="text-center py-8 text-gray-400">Loading...</td></tr>
+                ) : orders.length === 0 ? (
+                  <tr><td colSpan={7} className="text-center py-8 text-gray-400">No orders found.</td></tr>
+                ) : (
+                  orders.map((order) => (
+                    <tr key={order.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{order.order_number}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">{order.user?.name || "N/A"}</div>
+                          <div className="text-sm text-gray-500">{order.user?.email || "N/A"}</div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">₹{order.total_amount}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${order.status === 'approved' ? 'bg-green-100 text-green-800' :
+                          order.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                            'bg-yellow-100 text-yellow-800'
+                          }`}>
+                          {order.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.payment_status}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {new Date(order.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex space-x-3">
+                          <button
+                            onClick={async () => {
+                              // Ensure order_items are loaded before generating PDF
+                              let orderWithItems = { ...order };
+
+                              if (!order.order_items || order.order_items.length === 0) {
+                                toast.warning('Loading order items...');
+                                // Fetch order items for this specific order
+                                const { data: orderItems, error } = await supabase
+                                  .from("order_items")
+                                  .select(`
                                   *,
                                   product:products(
                                     tax_type,
@@ -1487,77 +1500,77 @@ const OrderManagementPage = () => {
                                     hsn_code
                                   )
                                 `)
-                                .eq("order_id", order.id);
-                              
-                              if (error) {
-                                toast.error('Failed to load order items');
-                                return;
+                                  .eq("order_id", order.id);
+
+                                if (error) {
+                                  toast.error('Failed to load order items');
+                                  return;
+                                }
+
+                                // Enrich items with tax/HSN data
+                                const enrichedItems = (orderItems || []).map((item: any) => ({
+                                  ...item,
+                                  hsn_code: item.hsn_code || item.product?.hsn_code || null,
+                                  tax_type: item.product?.tax_type || null,
+                                  tax_rate: item.product?.tax_rate || null,
+                                }));
+
+                                // Create new order object with items
+                                orderWithItems = {
+                                  ...order,
+                                  order_items: enrichedItems
+                                };
                               }
-                              
-                              // Enrich items with tax/HSN data
-                              const enrichedItems = (orderItems || []).map((item: any) => ({
-                                ...item,
-                                hsn_code: item.hsn_code || item.product?.hsn_code || null,
-                                tax_type: item.product?.tax_type || null,
-                                tax_rate: item.product?.tax_rate || null,
-                              }));
-                              
-                              // Create new order object with items
-                              orderWithItems = {
-                                ...order,
-                                order_items: enrichedItems
-                              };
-                            }
-                            await generateOrderPdf(orderWithItems);
-                          }}
-                          className="text-blue-600 hover:text-blue-900 transition"
-                          title="Download PDF"
-                        >
-                          PDF
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSelectedOrder(order);
-                            setViewModalOpen(true);
-                          }}
-                          className="text-blue-600 hover:text-blue-900 transition"
-                          title="View Details"
-                        >
-                          <Eye className="h-5 w-5" />
-                        </button>
-                        <button
-                          onClick={() => handleApprove(order.id)}
-                          className="text-green-600 hover:text-green-900 transition"
-                          disabled={order.status === 'approved'}
-                          title="Approve Order"
-                        >
-                          <CheckCircle className="h-5 w-5" />
-                        </button>
-                        <button
-                          onClick={() => handleReject(order.id)}
-                          className="text-red-600 hover:text-red-900 transition"
-                          disabled={order.status === 'rejected'}
-                          title="Reject Order"
-                        >
-                          <XCircle className="h-5 w-5" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(order.id)}
-                          className="text-red-600 hover:text-red-900 transition flex items-center gap-1"
-                          title="Delete Order"
-                        >
-                          <Trash2 className="h-4 w-4" /> Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                              await generateOrderPdf(orderWithItems);
+                            }}
+                            className="text-blue-600 hover:text-blue-900 transition"
+                            title="Download PDF"
+                          >
+                            PDF
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedOrder(order);
+                              setViewModalOpen(true);
+                            }}
+                            className="text-blue-600 hover:text-blue-900 transition"
+                            title="View Details"
+                          >
+                            <Eye className="h-5 w-5" />
+                          </button>
+                          <button
+                            onClick={() => handleApprove(order.id)}
+                            className="text-green-600 hover:text-green-900 transition"
+                            disabled={order.status === 'approved'}
+                            title="Approve Order"
+                          >
+                            <CheckCircle className="h-5 w-5" />
+                          </button>
+                          <button
+                            onClick={() => handleReject(order.id)}
+                            className="text-red-600 hover:text-red-900 transition"
+                            disabled={order.status === 'rejected'}
+                            title="Reject Order"
+                          >
+                            <XCircle className="h-5 w-5" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(order.id)}
+                            className="text-red-600 hover:text-red-900 transition flex items-center gap-1"
+                            title="Delete Order"
+                          >
+                            <Trash2 className="h-4 w-4" /> Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
-        )}
+      )}
 
       {/* Returns Table */}
       {orderView === 'returns' && (
@@ -1617,21 +1630,19 @@ const OrderManagementPage = () => {
                         ₹{returnOrder.refund_amount.toFixed(2)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          returnOrder.return_status === 'completed' ? 'bg-green-100 text-green-800' :
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${returnOrder.return_status === 'completed' ? 'bg-green-100 text-green-800' :
                           returnOrder.return_status === 'approved' ? 'bg-blue-100 text-blue-800' :
-                          returnOrder.return_status === 'rejected' ? 'bg-red-100 text-red-800' :
-                          'bg-yellow-100 text-yellow-800'
-                        }`}>
+                            returnOrder.return_status === 'rejected' ? 'bg-red-100 text-red-800' :
+                              'bg-yellow-100 text-yellow-800'
+                          }`}>
                           {returnOrder.return_status}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          returnOrder.refund_status === 'completed' ? 'bg-green-100 text-green-800' :
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${returnOrder.refund_status === 'completed' ? 'bg-green-100 text-green-800' :
                           returnOrder.refund_status === 'processed' ? 'bg-blue-100 text-blue-800' :
-                          'bg-yellow-100 text-yellow-800'
-                        }`}>
+                            'bg-yellow-100 text-yellow-800'
+                          }`}>
                           {returnOrder.refund_status}
                         </span>
                       </td>
@@ -1668,7 +1679,7 @@ const OrderManagementPage = () => {
           }}
         />
       )}
-      
+
       {viewModalOpen && selectedOrder && (
         <ViewDetailsModal
           order={selectedOrder!}
