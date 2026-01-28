@@ -111,8 +111,11 @@ function getStateFromPincode(pincode: string): string {
   if (prefix >= 40 && prefix <= 44) return 'MAHARASHTRA';
   if (prefix >= 45 && prefix <= 48) return 'MADHYA PRADESH';
   if (prefix === 49) return 'CHHATTISGARH';
-  if (prefix >= 50 && prefix <= 53) return 'TELANGANA'; // And AP shared ranges
-  if (prefix >= 51 && prefix <= 53) return 'ANDHRA PRADESH'; // Overlap handling needed, prioritizing AP for 51-53 usually
+  // Telangana: 50 (Hyderabad region - 500xxx, 501xxx, 502xxx, 503xxx)
+  // Andhra Pradesh: 51-53 (Coastal AP, Rayalaseema - includes Nellore 524xxx, Vijayawada, Guntur, etc.)
+  // Some 50xxxx also belong to AP but primarily Telangana, so we use state from address when available
+  if (prefix === 50) return 'TELANGANA';
+  if (prefix >= 51 && prefix <= 55) return 'ANDHRA PRADESH'; // 51x-55x are primarily Andhra Pradesh
   if (prefix >= 56 && prefix <= 59) return 'KARNATAKA';
   if (prefix >= 60 && prefix <= 66) return 'TAMIL NADU';
   if (prefix >= 67 && prefix <= 69) return 'KERALA';
@@ -128,20 +131,107 @@ function getStateFromPincode(pincode: string): string {
 function parseAddress(address: string) {
   if (!address) return { name: '', address: '', fullAddress: '', state: '', pincode: '', stateCode: '' };
 
-  const lines = address.split(',').map(s => s.trim());
+  // Try to parse as JSON first (addresses might be stored as JSON objects)
+  let parsedAddress = address;
+  try {
+    const jsonAddress = JSON.parse(address);
+    if (typeof jsonAddress === 'object' && jsonAddress !== null) {
+      // If it's a JSON object, extract fields and build a string
+      const parts: string[] = [];
+      if (jsonAddress.name || jsonAddress.fullName || jsonAddress.full_name) {
+        parts.push(jsonAddress.name || jsonAddress.fullName || jsonAddress.full_name);
+      }
+      if (jsonAddress.addressLine1 || jsonAddress.address_line1 || jsonAddress.line1 || jsonAddress.street) {
+        parts.push(jsonAddress.addressLine1 || jsonAddress.address_line1 || jsonAddress.line1 || jsonAddress.street);
+      }
+      if (jsonAddress.addressLine2 || jsonAddress.address_line2 || jsonAddress.line2) {
+        parts.push(jsonAddress.addressLine2 || jsonAddress.address_line2 || jsonAddress.line2);
+      }
+      if (jsonAddress.city) parts.push(jsonAddress.city);
+      if (jsonAddress.district) parts.push(jsonAddress.district);
+      if (jsonAddress.state) parts.push(jsonAddress.state);
+      if (jsonAddress.pincode || jsonAddress.postalCode || jsonAddress.postal_code || jsonAddress.zip) {
+        parts.push(jsonAddress.pincode || jsonAddress.postalCode || jsonAddress.postal_code || jsonAddress.zip);
+      }
+      if (jsonAddress.country) parts.push(jsonAddress.country);
+      if (jsonAddress.phone) parts.push(`Phone: ${jsonAddress.phone}`);
+
+      // Use the extracted state directly if available
+      if (jsonAddress.state) {
+        parsedAddress = parts.filter(Boolean).join(', ');
+        const stateFromJson = jsonAddress.state.toUpperCase();
+        const pincodeFromJson = jsonAddress.pincode || jsonAddress.postalCode || jsonAddress.postal_code || jsonAddress.zip || '';
+
+        // Get state code from the extracted state
+        const stateCodeMap: { [key: string]: string } = {
+          'JAMMU AND KASHMIR': '01', 'HIMACHAL PRADESH': '02', 'PUNJAB': '03', 'CHANDIGARH': '04',
+          'UTTARAKHAND': '05', 'HARYANA': '06', 'DELHI': '07', 'RAJASTHAN': '08', 'UTTAR PRADESH': '09',
+          'BIHAR': '10', 'SIKKIM': '11', 'ARUNACHAL PRADESH': '12', 'NAGALAND': '13', 'MANIPUR': '14',
+          'MIZORAM': '15', 'TRIPURA': '16', 'MEGHALAYA': '17', 'ASSAM': '18', 'WEST BENGAL': '19',
+          'JHARKHAND': '20', 'ODISHA': '21', 'CHHATTISGARH': '22', 'MADHYA PRADESH': '23', 'GUJARAT': '24',
+          'MAHARASHTRA': '27', 'KARNATAKA': '29', 'GOA': '30', 'LAKSHADWEEP': '31', 'KERALA': '32',
+          'TAMIL NADU': '33', 'PUDUCHERRY': '34', 'ANDAMAN AND NICOBAR': '35', 'TELANGANA': '36',
+          'ANDHRA PRADESH': '37', 'LADAKH': '38'
+        };
+
+        // Normalize state name for lookup
+        const normalizeState = (s: string) => {
+          const normalized = s.toUpperCase().trim();
+          const abbreviationMap: { [key: string]: string } = {
+            'AP': 'ANDHRA PRADESH', 'ANDHRA': 'ANDHRA PRADESH',
+            'TN': 'TAMIL NADU', 'TAMILNADU': 'TAMIL NADU',
+            'KA': 'KARNATAKA', 'KL': 'KERALA', 'MH': 'MAHARASHTRA',
+            'GJ': 'GUJARAT', 'RJ': 'RAJASTHAN', 'PB': 'PUNJAB', 'HR': 'HARYANA',
+            'UP': 'UTTAR PRADESH', 'WB': 'WEST BENGAL', 'BR': 'BIHAR', 'OR': 'ODISHA',
+            'MP': 'MADHYA PRADESH', 'JH': 'JHARKHAND', 'AS': 'ASSAM', 'CG': 'CHHATTISGARH',
+            'HP': 'HIMACHAL PRADESH', 'UK': 'UTTARAKHAND', 'GA': 'GOA', 'DL': 'DELHI',
+            'TG': 'TELANGANA', 'TS': 'TELANGANA'
+          };
+          return abbreviationMap[normalized] || normalized;
+        };
+
+        const normalizedState = normalizeState(stateFromJson);
+        const stateCode = stateCodeMap[normalizedState] || '';
+
+        return {
+          name: jsonAddress.name || jsonAddress.fullName || jsonAddress.full_name || '',
+          address: parsedAddress,
+          fullAddress: parsedAddress,
+          state: normalizedState,
+          pincode: pincodeFromJson,
+          stateCode
+        };
+      }
+
+      parsedAddress = parts.filter(Boolean).join(', ');
+    }
+  } catch (e) {
+    // Not JSON, use as-is
+  }
+
+  const lines = parsedAddress.split(',').map(s => s.trim());
   const name = lines[0] || '';
-  const pincodeMatch = address.match(/\b\d{6}\b/);
+  const pincodeMatch = parsedAddress.match(/\b\d{6}\b/);
   const pincode = pincodeMatch ? pincodeMatch[0] : '';
   // Store the full original address for display purposes
-  const fullAddress = address;
+  const fullAddress = parsedAddress;
 
   // Try to extract state (usually second to last or last)
   let state = '';
   let stateCode = '';
 
   // Expanded patterns including abbreviations and variations
+  // IMPORTANT: Use word boundaries (\b) to prevent matching abbreviations inside words
+  // e.g., "OR" should not match "or" in "Nellore"
+  // Prioritize full state names first, then abbreviations
   const statePatterns = [
-    /(ANDHRA PRADESH|ANDHRA|AP|TAMIL NADU|TAMILNADU|TN|KARNATAKA|KA|KERALA|KL|MAHARASHTRA|MH|GUJARAT|GJ|RAJASTHAN|RJ|PUNJAB|PB|HARYANA|HR|UTTAR PRADESH|UP|WEST BENGAL|WB|BIHAR|BR|ODISHA|OR|MADHYA PRADESH|MP|JHARKHAND|JH|ASSAM|AS|CHHATTISGARH|CG|HIMACHAL PRADESH|HP|UTTARAKHAND|UK|GOA|GA|MANIPUR|MN|MEGHALAYA|ML|NAGALAND|NL|TRIPURA|TR|ARUNACHAL PRADESH|AR|MIZORAM|MZ|SIKKIM|SK|DELHI|DL|NEW DELHI|PUDUCHERRY|PY|CHANDIGARH|CH|DADRA|DAMAN|LAKSHADWEEP|LD|JAMMU|KASHMIR|JK|LADAKH|LA|TELANGANA|TG|TS)/i
+    // First try to match full state names (most accurate)
+    /\b(ANDHRA PRADESH|TAMIL NADU|TAMILNADU|KARNATAKA|KERALA|MAHARASHTRA|GUJARAT|RAJASTHAN|PUNJAB|HARYANA|UTTAR PRADESH|WEST BENGAL|BIHAR|ODISHA|MADHYA PRADESH|JHARKHAND|ASSAM|CHHATTISGARH|HIMACHAL PRADESH|UTTARAKHAND|GOA|MANIPUR|MEGHALAYA|NAGALAND|TRIPURA|ARUNACHAL PRADESH|MIZORAM|SIKKIM|NEW DELHI|DELHI|PUDUCHERRY|CHANDIGARH|JAMMU AND KASHMIR|JAMMU|KASHMIR|LADAKH|TELANGANA|LAKSHADWEEP|DADRA AND NAGAR HAVELI|DAMAN AND DIU)\b/i,
+    // Then try partial/short names (still with word boundaries)
+    /\b(ANDHRA|TAMILNADU)\b/i,
+    // Finally try 2-letter state codes (strict word boundaries required)
+    /\b(AP|TN|KA|KL|MH|GJ|RJ|PB|HR|UP|WB|BR|MP|JH|AS|CG|HP|UK|GA|MN|ML|NL|TR|AR|MZ|SK|DL|PY|CH|LD|JK|LA|TG|TS)\b/i
+    // NOTE: "OR" for Odisha is intentionally omitted as it's too ambiguous
   ];
 
   let matchFound = false;
@@ -302,9 +392,28 @@ export async function generateOrderPdf(
     gstin: '37ABFCS0076F1ZE',
   };
 
-  // Parse addresses
-  const billingAddress = parseAddress(order.billing_address || '');
-  const shippingAddress = parseAddress(order.shipping_address || '');
+  // Parse addresses - billing address falls back to shipping address if empty
+  const rawBillingAddress = order.billing_address || order.shipping_address || '';
+  const rawShippingAddress = order.shipping_address || '';
+
+  const billingAddress = parseAddress(rawBillingAddress);
+  const shippingAddress = parseAddress(rawShippingAddress);
+
+  // Get customer name from order.user if available
+  const customerName = order.user?.name || '';
+  const customerPhone = order.user?.phone || '';
+
+  // Debug: Log address parsing results to help identify data issues
+  console.log('=== Address Parsing Debug ===');
+  console.log('Customer name:', customerName);
+  console.log('Customer phone:', customerPhone);
+  console.log('Raw billing_address:', order.billing_address);
+  console.log('Fallback billing to shipping:', !order.billing_address);
+  console.log('Parsed billing:', { state: billingAddress.state, stateCode: billingAddress.stateCode, pincode: billingAddress.pincode, fullAddress: billingAddress.fullAddress });
+  console.log('Raw shipping_address:', order.shipping_address);
+  console.log('Parsed shipping:', { state: shippingAddress.state, stateCode: shippingAddress.stateCode, pincode: shippingAddress.pincode, fullAddress: shippingAddress.fullAddress });
+  console.log('============================');
+
   const placeOfSupply = shippingAddress.state || 'N/A';
   const placeOfDelivery = shippingAddress.state || 'N/A';
 
@@ -639,13 +748,22 @@ export async function generateOrderPdf(
     doc.setDrawColor(200, 200, 200);
     doc.setLineWidth(0.2);
     doc.line(billingX + 2, addressBoxY + 12, billingX + addressBoxWidth - 2, addressBoxY + 12);
-
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     let billingTextY = addressBoxY + 20;
 
-    // Display the full billing address (includes name, street, city, state, pincode)
-    const billingAddressText = billingAddress.fullAddress || order.billing_address || 'N/A';
+    // Build billing address text with customer name if available
+    // If address doesn't include name, prepend customer name from order.user
+    let billingAddressText = billingAddress.fullAddress || rawBillingAddress || 'N/A';
+    if (billingAddressText !== 'N/A' && customerName && !billingAddressText.toLowerCase().includes(customerName.toLowerCase())) {
+      // Prepend customer name to address
+      billingAddressText = customerName + ', ' + billingAddressText;
+    }
+    if (billingAddressText !== 'N/A' && customerPhone && !billingAddressText.includes(customerPhone)) {
+      // Add phone if not already in address
+      billingAddressText += ', Phone: ' + customerPhone;
+    }
+
     const billingAddressLines = doc.splitTextToSize(billingAddressText, addressBoxWidth - 10);
     billingAddressLines.forEach((line: string) => {
       doc.text(line, billingX + 5, billingTextY);
@@ -674,8 +792,18 @@ export async function generateOrderPdf(
     doc.setFontSize(9);
     let shippingTextY = addressBoxY + 20;
 
-    // Display the full shipping address (includes name, street, city, state, pincode)
-    const shippingAddressText = shippingAddress.fullAddress || order.shipping_address || 'N/A';
+    // Build shipping address text with customer name if available
+    // If address doesn't include name, prepend customer name from order.user
+    let shippingAddressText = shippingAddress.fullAddress || rawShippingAddress || 'N/A';
+    if (shippingAddressText !== 'N/A' && customerName && !shippingAddressText.toLowerCase().includes(customerName.toLowerCase())) {
+      // Prepend customer name to address
+      shippingAddressText = customerName + ', ' + shippingAddressText;
+    }
+    if (shippingAddressText !== 'N/A' && customerPhone && !shippingAddressText.includes(customerPhone)) {
+      // Add phone if not already in address
+      shippingAddressText += ', Phone: ' + customerPhone;
+    }
+
     const shippingAddressLines = doc.splitTextToSize(shippingAddressText, addressBoxWidth - 10);
     shippingAddressLines.forEach((line: string) => {
       doc.text(line, shippingX + 5, shippingTextY);

@@ -113,6 +113,12 @@ const Sidebar = () => {
       path: "InfluencerProfiles",
     },
     {
+      name: "Influencer Requests",
+      icon: UserPlus,
+      link: "/admin/InfluencerRequests",
+      path: "InfluencerRequests",
+    },
+    {
       name: "Invoices & GST",
       icon: FileText,
       link: "/admin/InvoiceManagement",

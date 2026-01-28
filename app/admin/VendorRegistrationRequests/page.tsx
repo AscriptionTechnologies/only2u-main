@@ -25,6 +25,76 @@ type RegistrationRequest = {
   pan?: string;
 };
 
+// Mock data for demonstration when database is empty
+const MOCK_VENDOR_REQUESTS: RegistrationRequest[] = [
+  {
+    id: "mock-1",
+    business_name: "Saree Palace Boutique",
+    contact_name: "Rajesh Kumar",
+    email: "rajesh@sareepalace.com",
+    phone: "+91 98765 11111",
+    city: "Bengaluru",
+    state: "Karnataka",
+    status: "pending",
+    created_at: "2026-01-28T08:00:00Z",
+    gstin: "29AABCS1234A1Z5",
+    pan: "AABCS1234A",
+  },
+  {
+    id: "mock-2",
+    business_name: "Ethnic Threads India",
+    contact_name: "Sunita Devi",
+    email: "sunita@ethnicthreads.in",
+    phone: "+91 87654 22222",
+    city: "Jaipur",
+    state: "Rajasthan",
+    status: "pending",
+    created_at: "2026-01-27T14:30:00Z",
+    gstin: "08AABCE5678B1Z3",
+    pan: "AABCE5678B",
+  },
+  {
+    id: "mock-3",
+    business_name: "Chennai Silks Exporters",
+    contact_name: "Lakshmi Narayanan",
+    email: "lakshmi@chennaisilks.com",
+    phone: "+91 76543 33333",
+    city: "Chennai",
+    state: "Tamil Nadu",
+    status: "under_review",
+    created_at: "2026-01-26T10:15:00Z",
+    gstin: "33AABCD9012C1Z1",
+    pan: "AABCD9012C",
+  },
+  {
+    id: "mock-4",
+    business_name: "Lucknowi Chikan House",
+    contact_name: "Mohammad Imran",
+    email: "imran@chikanhouse.in",
+    phone: "+91 65432 44444",
+    city: "Lucknow",
+    state: "Uttar Pradesh",
+    status: "approved",
+    created_at: "2026-01-20T09:00:00Z",
+    reviewed_at: "2026-01-21T11:00:00Z",
+    gstin: "09AABCL3456D1Z9",
+    pan: "AABCL3456D",
+  },
+  {
+    id: "mock-5",
+    business_name: "Gujarat Handicrafts",
+    contact_name: "Bhavesh Patel",
+    email: "bhavesh@gujhandicrafts.com",
+    phone: "+91 54321 55555",
+    city: "Ahmedabad",
+    state: "Gujarat",
+    status: "rejected",
+    created_at: "2026-01-18T15:45:00Z",
+    reviewed_at: "2026-01-19T12:00:00Z",
+    rejection_reason: "Incomplete documentation. Missing GST certificate.",
+  },
+];
+
 export default function VendorRegistrationRequestsPage() {
   const [requests, setRequests] = useState<RegistrationRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,6 +102,7 @@ export default function VendorRegistrationRequestsPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [rejectionReason, setRejectionReason] = useState("");
   const [processing, setProcessing] = useState(false);
+  const [useMockData, setUseMockData] = useState(false);
 
   useEffect(() => {
     fetchRequests();
@@ -52,9 +123,26 @@ export default function VendorRegistrationRequestsPage() {
       const { data, error } = await query;
 
       if (error) throw error;
-      setRequests((data as RegistrationRequest[]) || []);
+
+      // If no data from database, use mock data for demonstration
+      if (!data || data.length === 0) {
+        setUseMockData(true);
+        const filteredMock = statusFilter === "all"
+          ? MOCK_VENDOR_REQUESTS
+          : MOCK_VENDOR_REQUESTS.filter(r => r.status === statusFilter);
+        setRequests(filteredMock);
+      } else {
+        setUseMockData(false);
+        setRequests((data as RegistrationRequest[]) || []);
+      }
     } catch (error: any) {
       console.error("Error fetching requests:", error);
+      // On error, show mock data
+      setUseMockData(true);
+      const filteredMock = statusFilter === "all"
+        ? MOCK_VENDOR_REQUESTS
+        : MOCK_VENDOR_REQUESTS.filter(r => r.status === statusFilter);
+      setRequests(filteredMock);
     } finally {
       setLoading(false);
     }
@@ -186,6 +274,17 @@ export default function VendorRegistrationRequestsPage() {
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Vendor Registration Requests</h1>
         <p className="text-gray-600">Review and approve vendor registration applications</p>
       </div>
+
+      {/* Mock data indicator */}
+      {useMockData && (
+        <div className="mb-6 bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-center gap-3">
+          <Clock className="w-5 h-5 text-amber-600" />
+          <div>
+            <p className="text-amber-800 font-medium">Demo Data</p>
+            <p className="text-amber-700 text-sm">Showing sample vendor requests for demonstration. Real requests will appear here when submitted through the app.</p>
+          </div>
+        </div>
+      )}
 
       {/* Filter */}
       <div className="mb-6">
