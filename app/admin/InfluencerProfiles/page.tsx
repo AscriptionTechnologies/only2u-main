@@ -103,6 +103,9 @@ export default function InfluencerProfilesPage() {
     fetchProfiles();
   }, []);
 
+  // Store product counts per influencer
+  const [productCounts, setProductCounts] = useState<Record<string, number>>({});
+
   const fetchProfiles = async () => {
     setLoading(true);
     const { data, error } = await supabase
@@ -114,10 +117,44 @@ export default function InfluencerProfilesPage() {
       console.error("Error fetching profiles:", error);
       setError("Failed to load influencer profiles. Please try again.");
     } else {
-      setProfiles((data as InfluencerProfile[]) || []);
+      const profilesData = (data as InfluencerProfile[]) || [];
+      setProfiles(profilesData);
       setError(null);
+
+      // Fetch product counts for each influencer
+      fetchProductCounts(profilesData.map(p => p.id));
     }
     setLoading(false);
+  };
+
+  // Fetch how many products each influencer has
+  const fetchProductCounts = async (influencerIds: string[]) => {
+    if (influencerIds.length === 0) return;
+
+    try {
+      // Get all products with influencer_id
+      const { data, error } = await supabase
+        .from("products")
+        .select("influencer_id")
+        .in("influencer_id", influencerIds);
+
+      if (error) {
+        console.error("Error fetching product counts:", error);
+        return;
+      }
+
+      // Count products per influencer
+      const counts: Record<string, number> = {};
+      (data || []).forEach((product: { influencer_id: string }) => {
+        if (product.influencer_id) {
+          counts[product.influencer_id] = (counts[product.influencer_id] || 0) + 1;
+        }
+      });
+
+      setProductCounts(counts);
+    } catch (err) {
+      console.error("Error counting products:", err);
+    }
   };
 
   const startEdit = (profile: InfluencerProfile) => {
@@ -208,14 +245,14 @@ export default function InfluencerProfilesPage() {
           profilePhotoFile,
           `influencers/${Date.now()}-${profilePhotoFile.name}`
         );
-        
+
         if (uploadResult.error) {
           setError(`Failed to upload profile photo: ${uploadResult.error}`);
           setSubmitting(false);
           setUploadingPhoto(false);
           return;
         }
-        
+
         profilePhotoUrl = uploadResult.url;
       } catch (uploadError: any) {
         setError(`Failed to upload profile photo: ${uploadError.message}`);
@@ -360,7 +397,7 @@ export default function InfluencerProfilesPage() {
 
   const generateVoucher = async () => {
     if (!selectedInfluencer) return;
-    
+
     if (!voucherForm.billNumber || !voucherForm.date || !voucherForm.amount) {
       setError("Bill Number, Date, and Amount are required.");
       return;
@@ -730,8 +767,8 @@ export default function InfluencerProfilesPage() {
                     ? "Uploading Photo..."
                     : "Saving..."
                   : editingProfile
-                  ? "Update Profile"
-                  : "Create Profile"}
+                    ? "Update Profile"
+                    : "Create Profile"}
               </button>
             </div>
           </form>
@@ -861,7 +898,12 @@ export default function InfluencerProfilesPage() {
                       <div className="flex flex-col">
                         <span>{profile.total_followers.toLocaleString()} followers</span>
                         <span className="text-gray-500">{profile.total_posts} posts</span>
-                        <span className="text-gray-500">{profile.total_products_promoted} products</span>
+                        <span className={`flex items-center gap-1 ${productCounts[profile.id] ? 'text-[#F53F7A] font-medium' : 'text-gray-500'}`}>
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                          </svg>
+                          {productCounts[profile.id] || 0} products
+                        </span>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm">
@@ -874,11 +916,10 @@ export default function InfluencerProfilesPage() {
                     </td>
                     <td className="px-6 py-4">
                       <span
-                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          profile.is_active
-                            ? "bg-green-100 text-green-700"
-                            : "bg-gray-100 text-gray-600"
-                        }`}
+                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${profile.is_active
+                          ? "bg-green-100 text-green-700"
+                          : "bg-gray-100 text-gray-600"
+                          }`}
                       >
                         {profile.is_active ? "Active" : "Inactive"}
                       </span>
@@ -893,11 +934,10 @@ export default function InfluencerProfilesPage() {
                       </button>
                       <button
                         onClick={() => toggleActiveStatus(profile)}
-                        className={`${
-                          profile.is_active
-                            ? "text-amber-600 hover:text-amber-700"
-                            : "text-green-600 hover:text-green-700"
-                        }`}
+                        className={`${profile.is_active
+                          ? "text-amber-600 hover:text-amber-700"
+                          : "text-green-600 hover:text-green-700"
+                          }`}
                       >
                         {profile.is_active ? "Deactivate" : "Activate"}
                       </button>
@@ -929,7 +969,7 @@ export default function InfluencerProfilesPage() {
             <h2 className="text-xl font-bold text-gray-900 mb-4">
               Generate Payment Voucher - {selectedInfluencer.name}
             </h2>
-            
+
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
