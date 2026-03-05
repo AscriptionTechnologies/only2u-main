@@ -6,7 +6,7 @@ import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { supabase } from "../../../lib/supabase";
 import { generateOrderPdf, generateReturnInvoicePdf } from "../../../lib/pdfUtils";
-import { exportToExcel } from "../../../lib/exportUtils";
+import { exportToExcel, exportToDelhiveryCSV } from "../../../lib/exportUtils";
 
 interface OrderItem {
   id: string;
@@ -136,6 +136,7 @@ const OrderManagementPage = () => {
   const [approvingOrder, setApprovingOrder] = useState<string | null>(null);
   const [rejectingOrder, setRejectingOrder] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [exportingDelhivery, setExportingDelhivery] = useState(false);
 
   useEffect(() => {
     fetchOrders();
@@ -672,16 +673,46 @@ const OrderManagementPage = () => {
     }
   };
 
+  const handleDelhiveryExport = async () => {
+    // Filter orders to include only "Approved" or "Pending" status
+    const validOrders = orders.filter(o =>
+      (o.status === 'approved' || o.status === 'pending')
+    );
+
+    if (validOrders.length === 0) {
+      toast.info("No approved or pending orders to export for Delhivery.");
+      return;
+    }
+
+    try {
+      setExportingDelhivery(true);
+      await exportToDelhiveryCSV(validOrders);
+      toast.success("Delhivery CSV exported successfully");
+    } catch (error) {
+      console.error("Error exporting for Delhivery:", error);
+      toast.error("Failed to export for Delhivery");
+    } finally {
+      setExportingDelhivery(false);
+    }
+  };
+
   const handleApprove = async (orderId: string) => {
     try {
-      const { error } = await supabase
-        .from("orders")
-        .update({ status: "approved" })
-        .eq("id", orderId);
+      setApprovingOrder(orderId);
+      const response = await fetch('/api/orders/approve', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          order_id: orderId,
+        }),
+      });
 
-      if (error) {
-        console.error("Error updating order:", error);
-        toast.error("Failed to approve order");
+      const result = await response.json();
+
+      if (!response.ok) {
+        toast.error(result.error || 'Failed to approve order');
         return;
       }
 
@@ -690,10 +721,17 @@ const OrderManagementPage = () => {
           order.id === orderId ? { ...order, status: "approved" } : order
         )
       );
-      toast.success("Order approved successfully");
+
+      if (result.shopifySync && !result.shopifySync.success) {
+        toast.warning("Order approved, but Shopify sync failed: " + (result.message || "Check logs"));
+      } else {
+        toast.success(result.message || "Order approved and synced successfully");
+      }
     } catch (error) {
       console.error("Error:", error);
       toast.error("An error occurred while approving order");
+    } finally {
+      setApprovingOrder(null);
     }
   };
 
@@ -1199,13 +1237,13 @@ const OrderManagementPage = () => {
   };
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
+    <div className="p-4 md:p-6 pb-20 md:pb-6">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Order Management</h1>
-        <div className="flex gap-3 items-center">
+        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center w-full md:w-auto">
           <button
             onClick={handleDownloadSampleInvoiceAndReturn}
-            className="flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300"
+            className="flex items-center justify-center w-full sm:w-auto gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300"
           >
             <svg className="w-4 h-4 text-[#F53F7A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
@@ -1215,7 +1253,7 @@ const OrderManagementPage = () => {
           <button
             onClick={handleExport}
             disabled={exporting || currentOrders.length === 0}
-            className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${exporting || currentOrders.length === 0
+            className={`flex items-center justify-center w-full sm:w-auto gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${exporting || currentOrders.length === 0
               ? "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed"
               : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300"
               }`}
@@ -1258,12 +1296,38 @@ const OrderManagementPage = () => {
               </>
             )}
           </button>
-          <span className="text-sm text-gray-600">
+
+          <button
+            onClick={handleDelhiveryExport}
+            disabled={exportingDelhivery || orders.length === 0}
+            className={`flex items-center justify-center w-full sm:w-auto gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${exportingDelhivery || orders.length === 0
+                ? "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed"
+                : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300"
+              }`}
+          >
+            {exportingDelhivery ? (
+              <>
+                <svg className="h-4 w-4 animate-spin text-[#F53F7A]" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3.5-3.5L12 0v4a8 8 0 00-8 8h4z"></path>
+                </svg>
+                Exporting...
+              </>
+            ) : (
+              <>
+                <svg className="h-4 w-4 text-[#F53F7A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Export Delhivery
+              </>
+            )}
+          </button>
+          <span className="text-sm text-gray-600 hidden sm:inline-block">
             {orderView === "draft"
-              ? `${draftOrders.filter((o) => o.status === "draft").length} pending draft orders`
+              ? `${draftOrders.filter((o) => o.status === "draft").length} pending`
               : orderView === "returns"
-                ? `${returnOrders.length} return orders`
-                : `${orders.length} total orders`}
+                ? `${returnOrders.length} returns`
+                : `${orders.length} orders`}
           </span>
         </div>
       </div>
@@ -1271,20 +1335,20 @@ const OrderManagementPage = () => {
       {/* Order Type Filter Tabs */}
       <div className="mb-6">
         <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8">
+          <nav className="-mb-px grid grid-cols-3 md:flex md:space-x-8 md:min-w-max w-full md:w-auto pb-1" aria-label="Tabs">
             <button
               onClick={() => setOrderView('draft')}
               className={`${orderView === 'draft'
                 ? 'border-[#F53F7A] text-[#F53F7A]'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-2`}
+                } group whitespace-nowrap py-3 md:py-4 px-1 border-b-2 font-medium text-xs md:text-sm transition-colors flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-2`}
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className={`w-5 h-5 ${orderView === 'draft' ? 'text-[#F53F7A]' : 'text-gray-400 group-hover:text-gray-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              Draft Orders (Out-of-Stock)
+              <span>Drafts</span>
               {draftOrders.filter(o => o.status === 'draft').length > 0 && (
-                <span className="bg-amber-100 text-amber-800 text-xs font-semibold px-2 py-0.5 rounded-full">
+                <span className="bg-amber-100 text-amber-800 text-[10px] md:text-xs font-semibold px-1.5 py-0.5 rounded-full md:ml-1">
                   {draftOrders.filter(o => o.status === 'draft').length}
                 </span>
               )}
@@ -1294,14 +1358,14 @@ const OrderManagementPage = () => {
               className={`${orderView === 'regular'
                 ? 'border-[#F53F7A] text-[#F53F7A]'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-2`}
+                } group whitespace-nowrap py-3 md:py-4 px-1 border-b-2 font-medium text-xs md:text-sm transition-colors flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-2`}
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className={`w-5 h-5 ${orderView === 'regular' ? 'text-[#F53F7A]' : 'text-gray-400 group-hover:text-gray-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
-              Regular Orders
+              <span>Orders</span>
               {orders.length > 0 && (
-                <span className="bg-green-100 text-green-800 text-xs font-semibold px-2 py-0.5 rounded-full">
+                <span className="bg-green-100 text-green-800 text-[10px] md:text-xs font-semibold px-1.5 py-0.5 rounded-full md:ml-1">
                   {orders.length}
                 </span>
               )}
@@ -1311,14 +1375,14 @@ const OrderManagementPage = () => {
               className={`${orderView === 'returns'
                 ? 'border-[#F53F7A] text-[#F53F7A]'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-2`}
+                } group whitespace-nowrap py-3 md:py-4 px-1 border-b-2 font-medium text-xs md:text-sm transition-colors flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-2`}
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className={`w-5 h-5 ${orderView === 'returns' ? 'text-[#F53F7A]' : 'text-gray-400 group-hover:text-gray-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
-              Sales Returns
+              <span>Returns</span>
               {returnOrders.length > 0 && (
-                <span className="bg-red-100 text-red-800 text-xs font-semibold px-2 py-0.5 rounded-full">
+                <span className="bg-red-100 text-red-800 text-[10px] md:text-xs font-semibold px-1.5 py-0.5 rounded-full md:ml-1">
                   {returnOrders.length}
                 </span>
               )}
@@ -1329,170 +1393,258 @@ const OrderManagementPage = () => {
 
       {/* Draft Orders Table */}
       {orderView === 'draft' && (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200 bg-amber-50">
-            <div className="flex items-center gap-2">
-              <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              <p className="text-sm text-amber-800 font-medium">
-                Draft orders are placed by customers when products are out of stock. Review and approve/reject them here.
-              </p>
+        <>
+          {/* Desktop Table */}
+          <div className="hidden md:block bg-white rounded-lg shadow overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 bg-amber-50">
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <p className="text-sm text-amber-800 font-medium">
+                  Draft orders are placed by customers when products are out of stock. Review and approve/reject them here.
+                </p>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order Number</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Amount</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {loading ? (
+                    <tr><td colSpan={6} className="text-center py-8 text-gray-400">Loading...</td></tr>
+                  ) : draftOrders.length === 0 ? (
+                    <tr><td colSpan={6} className="text-center py-8 text-gray-400">No draft orders found.</td></tr>
+                  ) : (
+                    draftOrders.map((draftOrder) => (
+                      <tr key={draftOrder.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-gray-900">{draftOrder.order_number}</span>
+                            <span className="px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-700">DRAFT</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{draftOrder.user?.name || "N/A"}</div>
+                            <div className="text-sm text-gray-500">{draftOrder.user?.email || "N/A"}</div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">₹{draftOrder.total_amount}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${draftOrder.status === 'approved' ? 'bg-green-100 text-green-800' :
+                            draftOrder.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                              'bg-amber-100 text-amber-800'
+                            }`}>
+                            {draftOrder.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {new Date(draftOrder.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex space-x-3">
+                            <button
+                              onClick={() => {
+                                setSelectedDraftOrder(draftOrder);
+                                setViewDraftModalOpen(true);
+                              }}
+                              className="text-blue-600 hover:text-blue-900 transition"
+                              title="View Details"
+                            >
+                              <Eye className="h-5 w-5" />
+                            </button>
+                            {draftOrder.status === 'draft' && (
+                              <>
+                                <button
+                                  onClick={() => handleApproveDraftOrder(draftOrder.id)}
+                                  className="text-green-600 hover:text-green-900 transition flex items-center gap-1"
+                                  disabled={approvingOrder === draftOrder.id}
+                                  title="Approve Order"
+                                >
+                                  <CheckCircle className="h-5 w-5" />
+                                  {approvingOrder === draftOrder.id && <span className="text-xs">...</span>}
+                                </button>
+                                <button
+                                  onClick={() => handleRejectDraftOrder(draftOrder.id)}
+                                  className="text-red-600 hover:text-red-900 transition flex items-center gap-1"
+                                  disabled={rejectingOrder === draftOrder.id}
+                                  title="Reject Order"
+                                >
+                                  <XCircle className="h-5 w-5" />
+                                  {rejectingOrder === draftOrder.id && <span className="text-xs">...</span>}
+                                </button>
+                              </>
+                            )}
+                            <button
+                              onClick={() => handleDeleteDraftOrder(draftOrder.id)}
+                              className="text-red-600 hover:text-red-900 transition"
+                              title="Delete Draft Order"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order Number</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Amount</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {loading ? (
-                  <tr><td colSpan={6} className="text-center py-8 text-gray-400">Loading...</td></tr>
-                ) : draftOrders.length === 0 ? (
-                  <tr><td colSpan={6} className="text-center py-8 text-gray-400">No draft orders found.</td></tr>
-                ) : (
-                  draftOrders.map((draftOrder) => (
-                    <tr key={draftOrder.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-gray-900">{draftOrder.order_number}</span>
-                          <span className="px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-700">DRAFT</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">{draftOrder.user?.name || "N/A"}</div>
-                          <div className="text-sm text-gray-500">{draftOrder.user?.email || "N/A"}</div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">₹{draftOrder.total_amount}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${draftOrder.status === 'approved' ? 'bg-green-100 text-green-800' :
-                          draftOrder.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                            'bg-amber-100 text-amber-800'
-                          }`}>
-                          {draftOrder.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(draftOrder.created_at).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex space-x-3">
-                          <button
-                            onClick={() => {
-                              setSelectedDraftOrder(draftOrder);
-                              setViewDraftModalOpen(true);
-                            }}
-                            className="text-blue-600 hover:text-blue-900 transition"
-                            title="View Details"
-                          >
-                            <Eye className="h-5 w-5" />
-                          </button>
-                          {draftOrder.status === 'draft' && (
-                            <>
-                              <button
-                                onClick={() => handleApproveDraftOrder(draftOrder.id)}
-                                className="text-green-600 hover:text-green-900 transition flex items-center gap-1"
-                                disabled={approvingOrder === draftOrder.id}
-                                title="Approve Order"
-                              >
-                                <CheckCircle className="h-5 w-5" />
-                                {approvingOrder === draftOrder.id && <span className="text-xs">...</span>}
-                              </button>
-                              <button
-                                onClick={() => handleRejectDraftOrder(draftOrder.id)}
-                                className="text-red-600 hover:text-red-900 transition flex items-center gap-1"
-                                disabled={rejectingOrder === draftOrder.id}
-                                title="Reject Order"
-                              >
-                                <XCircle className="h-5 w-5" />
-                                {rejectingOrder === draftOrder.id && <span className="text-xs">...</span>}
-                              </button>
-                            </>
-                          )}
-                          <button
-                            onClick={() => handleDeleteDraftOrder(draftOrder.id)}
-                            className="text-red-600 hover:text-red-900 transition"
-                            title="Delete Draft Order"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+
+          {/* Mobile Cards for Draft Orders */}
+          <div className="md:hidden space-y-4">
+            {loading ? (
+              <div className="text-center py-8 text-gray-400">Loading...</div>
+            ) : draftOrders.length === 0 ? (
+              <div className="text-center py-8 text-gray-400">No draft orders found.</div>
+            ) : (
+              draftOrders.map((draftOrder) => (
+                <div key={draftOrder.id} className="bg-white rounded-lg shadow p-4 space-y-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-gray-900">{draftOrder.order_number}</span>
+                        <span className="px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-700">DRAFT</span>
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">{new Date(draftOrder.created_at).toLocaleDateString()}</div>
+                    </div>
+                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${draftOrder.status === 'approved' ? 'bg-green-100 text-green-800' :
+                      draftOrder.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                        'bg-amber-100 text-amber-800'
+                      }`}>
+                      {draftOrder.status}
+                    </span>
+                  </div>
+
+                  <div className="border-t border-gray-100 pt-3">
+                    <div className="flex justify-between mb-1">
+                      <span className="text-xs text-gray-500">Customer</span>
+                      <span className="text-xs font-medium text-gray-900 text-right">
+                        {draftOrder.user?.name || "N/A"}<br />
+                        <span className="text-gray-400 font-normal">{draftOrder.user?.email}</span>
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-xs text-gray-500">Total</span>
+                      <span className="text-sm font-bold text-gray-900">₹{draftOrder.total_amount}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
+                    <button
+                      onClick={() => {
+                        setSelectedDraftOrder(draftOrder);
+                        setViewDraftModalOpen(true);
+                      }}
+                      className="p-2 text-blue-600 bg-blue-50 rounded-full hover:bg-blue-100 transition"
+                      title="View Details"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </button>
+                    {draftOrder.status === 'draft' && (
+                      <>
+                        <button
+                          onClick={() => handleApproveDraftOrder(draftOrder.id)}
+                          className="p-2 text-green-600 bg-green-50 rounded-full hover:bg-green-100 transition"
+                          disabled={approvingOrder === draftOrder.id}
+                          title="Approve Order"
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleRejectDraftOrder(draftOrder.id)}
+                          className="p-2 text-red-600 bg-red-50 rounded-full hover:bg-red-100 transition"
+                          disabled={rejectingOrder === draftOrder.id}
+                          title="Reject Order"
+                        >
+                          <XCircle className="h-4 w-4" />
+                        </button>
+                      </>
+                    )}
+                    <button
+                      onClick={() => handleDeleteDraftOrder(draftOrder.id)}
+                      className="p-2 text-red-600 bg-red-50 rounded-full hover:bg-red-100 transition"
+                      title="Delete Draft Order"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
-        </div>
+        </>
       )}
 
       {/* Regular Orders Table */}
       {orderView === 'regular' && (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order Number</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Amount</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {loading ? (
-                  <tr><td colSpan={7} className="text-center py-8 text-gray-400">Loading...</td></tr>
-                ) : orders.length === 0 ? (
-                  <tr><td colSpan={7} className="text-center py-8 text-gray-400">No orders found.</td></tr>
-                ) : (
-                  orders.map((order) => (
-                    <tr key={order.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{order.order_number}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">{order.user?.name || "N/A"}</div>
-                          <div className="text-sm text-gray-500">{order.user?.email || "N/A"}</div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">₹{order.total_amount}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${order.status === 'approved' ? 'bg-green-100 text-green-800' :
-                          order.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                            'bg-yellow-100 text-yellow-800'
-                          }`}>
-                          {order.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.payment_status}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(order.created_at).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex space-x-3">
-                          <button
-                            onClick={async () => {
-                              // Ensure order_items are loaded before generating PDF
-                              let orderWithItems = { ...order };
+        <>
+          {/* Desktop Table */}
+          <div className="hidden md:block bg-white rounded-lg shadow overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order Number</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Amount</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {loading ? (
+                    <tr><td colSpan={7} className="text-center py-8 text-gray-400">Loading...</td></tr>
+                  ) : orders.length === 0 ? (
+                    <tr><td colSpan={7} className="text-center py-8 text-gray-400">No orders found.</td></tr>
+                  ) : (
+                    orders.map((order) => (
+                      <tr key={order.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{order.order_number}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{order.user?.name || "N/A"}</div>
+                            <div className="text-sm text-gray-500">{order.user?.email || "N/A"}</div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">₹{order.total_amount}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${order.status === 'approved' ? 'bg-green-100 text-green-800' :
+                            order.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                              'bg-yellow-100 text-yellow-800'
+                            }`}>
+                            {order.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.payment_status}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {new Date(order.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex space-x-3">
+                            <button
+                              onClick={async () => {
+                                // Ensure order_items are loaded before generating PDF
+                                let orderWithItems = { ...order };
 
-                              if (!order.order_items || order.order_items.length === 0) {
-                                toast.warning('Loading order items...');
-                                // Fetch order items for this specific order
-                                const { data: orderItems, error } = await supabase
-                                  .from("order_items")
-                                  .select(`
+                                if (!order.order_items || order.order_items.length === 0) {
+                                  toast.warning('Loading order items...');
+                                  // Fetch order items for this specific order
+                                  const { data: orderItems, error } = await supabase
+                                    .from("order_items")
+                                    .select(`
                                   *,
                                   product:products(
                                     tax_type,
@@ -1500,174 +1652,362 @@ const OrderManagementPage = () => {
                                     hsn_code
                                   )
                                 `)
-                                  .eq("order_id", order.id);
+                                    .eq("order_id", order.id);
 
-                                if (error) {
-                                  toast.error('Failed to load order items');
-                                  return;
+                                  if (error) {
+                                    toast.error('Failed to load order items');
+                                    return;
+                                  }
+
+                                  // Enrich items with tax/HSN data
+                                  const enrichedItems = (orderItems || []).map((item: any) => ({
+                                    ...item,
+                                    hsn_code: item.hsn_code || item.product?.hsn_code || null,
+                                    tax_type: item.product?.tax_type || null,
+                                    tax_rate: item.product?.tax_rate || null,
+                                  }));
+
+                                  // Create new order object with items
+                                  orderWithItems = {
+                                    ...order,
+                                    order_items: enrichedItems
+                                  };
                                 }
-
-                                // Enrich items with tax/HSN data
-                                const enrichedItems = (orderItems || []).map((item: any) => ({
-                                  ...item,
-                                  hsn_code: item.hsn_code || item.product?.hsn_code || null,
-                                  tax_type: item.product?.tax_type || null,
-                                  tax_rate: item.product?.tax_rate || null,
-                                }));
-
-                                // Create new order object with items
-                                orderWithItems = {
-                                  ...order,
-                                  order_items: enrichedItems
-                                };
-                              }
-                              await generateOrderPdf(orderWithItems);
-                            }}
-                            className="text-blue-600 hover:text-blue-900 transition"
-                            title="Download PDF"
-                          >
-                            PDF
-                          </button>
-                          <button
-                            onClick={() => {
-                              setSelectedOrder(order);
-                              setViewModalOpen(true);
-                            }}
-                            className="text-blue-600 hover:text-blue-900 transition"
-                            title="View Details"
-                          >
-                            <Eye className="h-5 w-5" />
-                          </button>
-                          <button
-                            onClick={() => handleApprove(order.id)}
-                            className="text-green-600 hover:text-green-900 transition"
-                            disabled={order.status === 'approved'}
-                            title="Approve Order"
-                          >
-                            <CheckCircle className="h-5 w-5" />
-                          </button>
-                          <button
-                            onClick={() => handleReject(order.id)}
-                            className="text-red-600 hover:text-red-900 transition"
-                            disabled={order.status === 'rejected'}
-                            title="Reject Order"
-                          >
-                            <XCircle className="h-5 w-5" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(order.id)}
-                            className="text-red-600 hover:text-red-900 transition flex items-center gap-1"
-                            title="Delete Order"
-                          >
-                            <Trash2 className="h-4 w-4" /> Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                                await generateOrderPdf(orderWithItems);
+                              }}
+                              className="text-blue-600 hover:text-blue-900 transition"
+                              title="Download PDF"
+                            >
+                              PDF
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSelectedOrder(order);
+                                setViewModalOpen(true);
+                              }}
+                              className="text-blue-600 hover:text-blue-900 transition"
+                              title="View Details"
+                            >
+                              <Eye className="h-5 w-5" />
+                            </button>
+                            <button
+                              onClick={() => handleApprove(order.id)}
+                              className="text-green-600 hover:text-green-900 transition"
+                              disabled={order.status === 'approved'}
+                              title="Approve Order"
+                            >
+                              <CheckCircle className="h-5 w-5" />
+                            </button>
+                            <button
+                              onClick={() => handleReject(order.id)}
+                              className="text-red-600 hover:text-red-900 transition"
+                              disabled={order.status === 'rejected'}
+                              title="Reject Order"
+                            >
+                              <XCircle className="h-5 w-5" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(order.id)}
+                              className="text-red-600 hover:text-red-900 transition flex items-center gap-1"
+                              title="Delete Order"
+                            >
+                              <Trash2 className="h-4 w-4" /> Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+
+          {/* Mobile Cards for Regular Orders */}
+          <div className="md:hidden space-y-4">
+            {loading ? (
+              <div className="text-center py-8 text-gray-400">Loading...</div>
+            ) : orders.length === 0 ? (
+              <div className="text-center py-8 text-gray-400">No orders found.</div>
+            ) : (
+              orders.map((order) => (
+                <div key={order.id} className="bg-white rounded-lg shadow p-4 space-y-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="text-sm font-bold text-gray-900 block">{order.order_number}</span>
+                      <div className="text-xs text-gray-500 mt-1">{new Date(order.created_at).toLocaleDateString()}</div>
+                    </div>
+                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${order.status === 'approved' ? 'bg-green-100 text-green-800' :
+                      order.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                        'bg-yellow-100 text-yellow-800'
+                      }`}>
+                      {order.status}
+                    </span>
+                  </div>
+
+                  <div className="border-t border-gray-100 pt-3">
+                    <div className="flex justify-between mb-1">
+                      <span className="text-xs text-gray-500">Customer</span>
+                      <span className="text-xs font-medium text-gray-900 text-right">
+                        {order.user?.name || "N/A"}<br />
+                        <span className="text-gray-400 font-normal">{order.user?.email}</span>
+                      </span>
+                    </div>
+                    <div className="flex justify-between mb-1">
+                      <span className="text-xs text-gray-500">Amount</span>
+                      <span className="text-sm font-bold text-gray-900">₹{order.total_amount}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-xs text-gray-500">Payment</span>
+                      <span className="text-xs text-gray-700 capitalize">{order.payment_status}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-3 pt-2 border-t border-gray-100 flex-wrap">
+                    <button
+                      onClick={async () => {
+                        // Ensure order_items are loaded before generating PDF
+                        let orderWithItems = { ...order };
+
+                        if (!order.order_items || order.order_items.length === 0) {
+                          toast.warning('Loading order items...');
+                          // Fetch order items for this specific order
+                          const { data: orderItems, error } = await supabase
+                            .from("order_items")
+                            .select(`
+                                  *,
+                                  product:products(
+                                    tax_type,
+                                    tax_rate,
+                                    hsn_code
+                                  )
+                                `)
+                            .eq("order_id", order.id);
+
+                          if (error) {
+                            toast.error('Failed to load order items');
+                            return;
+                          }
+
+                          // Enrich items with tax/HSN data
+                          const enrichedItems = (orderItems || []).map((item: any) => ({
+                            ...item,
+                            hsn_code: item.hsn_code || item.product?.hsn_code || null,
+                            tax_type: item.product?.tax_type || null,
+                            tax_rate: item.product?.tax_rate || null,
+                          }));
+
+                          // Create new order object with items
+                          orderWithItems = {
+                            ...order,
+                            order_items: enrichedItems
+                          };
+                        }
+                        await generateOrderPdf(orderWithItems);
+                      }}
+                      className="p-2 text-blue-600 bg-blue-50 rounded-full hover:bg-blue-100 transition"
+                      title="Download PDF"
+                    >
+                      <span className="text-xs font-bold">PDF</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedOrder(order);
+                        setViewModalOpen(true);
+                      }}
+                      className="p-2 text-blue-600 bg-blue-50 rounded-full hover:bg-blue-100 transition"
+                      title="View Details"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleApprove(order.id)}
+                      className="p-2 text-green-600 bg-green-50 rounded-full hover:bg-green-100 transition"
+                      disabled={order.status === 'approved'}
+                      title="Approve Order"
+                    >
+                      <CheckCircle className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleReject(order.id)}
+                      className="p-2 text-red-600 bg-red-50 rounded-full hover:bg-red-100 transition"
+                      disabled={order.status === 'rejected'}
+                      title="Reject Order"
+                    >
+                      <XCircle className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(order.id)}
+                      className="p-2 text-red-600 bg-red-50 rounded-full hover:bg-red-100 transition"
+                      title="Delete Order"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </>
       )}
 
       {/* Returns Table */}
       {orderView === 'returns' && (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200 bg-red-50">
-            <div className="flex items-center gap-2">
-              <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              <h2 className="text-lg font-semibold text-gray-900">Sales Return Orders</h2>
+        <>
+          {/* Desktop Table */}
+          <div className="hidden md:block bg-white rounded-lg shadow overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 bg-red-50">
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <h2 className="text-lg font-semibold text-gray-900">Sales Return Orders</h2>
+              </div>
             </div>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Return Number</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Original Order</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Refund Amount</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Return Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Refund Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Return Date</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {loadingReturns ? (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
                   <tr>
-                    <td colSpan={8} className="px-6 py-10 text-center text-gray-400">
-                      Loading return orders...
-                    </td>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Return Number</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Original Order</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Refund Amount</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Return Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Refund Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Return Date</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                   </tr>
-                ) : returnOrders.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="px-6 py-10 text-center text-gray-400">
-                      No return orders found.
-                    </td>
-                  </tr>
-                ) : (
-                  returnOrders.map((returnOrder) => (
-                    <tr key={returnOrder.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{returnOrder.return_number}</div>
-                        {returnOrder.return_reason && (
-                          <div className="text-xs text-gray-500 mt-1">{returnOrder.return_reason.substring(0, 50)}...</div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {returnOrder.order?.order_number || 'N/A'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{returnOrder.user?.name || 'N/A'}</div>
-                        <div className="text-xs text-gray-500">{returnOrder.user?.email || ''}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-red-600">
-                        ₹{returnOrder.refund_amount.toFixed(2)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${returnOrder.return_status === 'completed' ? 'bg-green-100 text-green-800' :
-                          returnOrder.return_status === 'approved' ? 'bg-blue-100 text-blue-800' :
-                            returnOrder.return_status === 'rejected' ? 'bg-red-100 text-red-800' :
-                              'bg-yellow-100 text-yellow-800'
-                          }`}>
-                          {returnOrder.return_status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${returnOrder.refund_status === 'completed' ? 'bg-green-100 text-green-800' :
-                          returnOrder.refund_status === 'processed' ? 'bg-blue-100 text-blue-800' :
-                            'bg-yellow-100 text-yellow-800'
-                          }`}>
-                          {returnOrder.refund_status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(returnOrder.return_date).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <button
-                          onClick={() => downloadReturnInvoice(returnOrder)}
-                          className="text-red-600 hover:text-red-900 transition flex items-center gap-1"
-                          title="Download Return Invoice PDF"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                          Return Invoice
-                        </button>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {loadingReturns ? (
+                    <tr>
+                      <td colSpan={8} className="px-6 py-10 text-center text-gray-400">
+                        Loading return orders...
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : returnOrders.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="px-6 py-10 text-center text-gray-400">
+                        No return orders found.
+                      </td>
+                    </tr>
+                  ) : (
+                    returnOrders.map((returnOrder) => (
+                      <tr key={returnOrder.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">{returnOrder.return_number}</div>
+                          {returnOrder.return_reason && (
+                            <div className="text-xs text-gray-500 mt-1">{returnOrder.return_reason.substring(0, 50)}...</div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {returnOrder.order?.order_number || 'N/A'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">{returnOrder.user?.name || 'N/A'}</div>
+                          <div className="text-xs text-gray-500">{returnOrder.user?.email || ''}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-red-600">
+                          ₹{returnOrder.refund_amount.toFixed(2)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${returnOrder.return_status === 'completed' ? 'bg-green-100 text-green-800' :
+                            returnOrder.return_status === 'approved' ? 'bg-blue-100 text-blue-800' :
+                              returnOrder.return_status === 'rejected' ? 'bg-red-100 text-red-800' :
+                                'bg-yellow-100 text-yellow-800'
+                            }`}>
+                            {returnOrder.return_status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${returnOrder.refund_status === 'completed' ? 'bg-green-100 text-green-800' :
+                            returnOrder.refund_status === 'processed' ? 'bg-blue-100 text-blue-800' :
+                              'bg-yellow-100 text-yellow-800'
+                            }`}>
+                            {returnOrder.refund_status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {new Date(returnOrder.return_date).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <button
+                            onClick={() => downloadReturnInvoice(returnOrder)}
+                            className="text-red-600 hover:text-red-900 transition flex items-center gap-1"
+                            title="Download Return Invoice PDF"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            Return Invoice
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+
+          {/* Mobile Cards for Return Orders */}
+          <div className="md:hidden space-y-4">
+            {loadingReturns ? (
+              <div className="text-center py-8 text-gray-400">Loading returns...</div>
+            ) : returnOrders.length === 0 ? (
+              <div className="text-center py-8 text-gray-400">No return orders found.</div>
+            ) : (
+              returnOrders.map((returnOrder) => (
+                <div key={returnOrder.id} className="bg-white rounded-lg shadow p-4 space-y-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="text-sm font-bold text-gray-900 block">{returnOrder.return_number}</span>
+                      <div className="text-xs text-gray-500 mt-1">Orig No: {returnOrder.order?.order_number || 'N/A'}</div>
+                    </div>
+                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${returnOrder.return_status === 'completed' ? 'bg-green-100 text-green-800' :
+                      returnOrder.return_status === 'approved' ? 'bg-blue-100 text-blue-800' :
+                        returnOrder.return_status === 'rejected' ? 'bg-red-100 text-red-800' :
+                          'bg-yellow-100 text-yellow-800'
+                      }`}>
+                      {returnOrder.return_status}
+                    </span>
+                  </div>
+
+                  <div className="border-t border-gray-100 pt-3">
+                    <div className="flex justify-between mb-1">
+                      <span className="text-xs text-gray-500">Customer</span>
+                      <span className="text-xs font-medium text-gray-900 text-right">
+                        {returnOrder.user?.name || "N/A"}<br />
+                        <span className="text-gray-400 font-normal">{returnOrder.user?.email}</span>
+                      </span>
+                    </div>
+                    <div className="flex justify-between mb-1">
+                      <span className="text-xs text-gray-500">Refund Amount</span>
+                      <span className="text-sm font-bold text-red-600">₹{returnOrder.refund_amount.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-xs text-gray-500">Refund Status</span>
+                      <span className="text-xs text-gray-700 capitalize">{returnOrder.refund_status}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
+                    <button
+                      onClick={() => downloadReturnInvoice(returnOrder)}
+                      className="text-red-600 hover:text-red-900 transition flex items-center gap-1 text-xs font-medium"
+                      title="Download Return Invoice PDF"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      Invoice
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </>
       )}
 
       {viewDraftModalOpen && selectedDraftOrder && (

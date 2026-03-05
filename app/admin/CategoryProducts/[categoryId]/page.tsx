@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams, usePathname } from "next/navigation";
 import { supabase } from "../../../../lib/supabase";
 import { exportToExcel } from "../../../../lib/exportUtils";
 
@@ -63,19 +63,53 @@ export default function CategoryProducts() {
   const categoryId = Array.isArray((params as any)?.categoryId)
     ? ((params as any)?.categoryId[0] as string | undefined)
     : ((params as any)?.categoryId as string | undefined);
-  
+
   const [category, setCategory] = useState<Category | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [vendors, setVendors] = useState<VendorOption[]>([]);
-  const [searchSku, setSearchSku] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
-  const [featuredFilter, setFeaturedFilter] = useState<"all" | "best_seller" | "trending" | "none">("all");
-  const [vendorFilter, setVendorFilter] = useState<string>("all");
-  const [minPrice, setMinPrice] = useState<number | "">("");
-  const [maxPrice, setMaxPrice] = useState<number | "">("");
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // Initialize state from URL params
+  const [searchSku, setSearchSku] = useState(searchParams?.get("searchSku") || "");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">((searchParams?.get("statusFilter") as "all" | "active" | "inactive") || "all");
+  const [featuredFilter, setFeaturedFilter] = useState<"all" | "best_seller" | "trending" | "none">((searchParams?.get("featuredFilter") as "all" | "best_seller" | "trending" | "none") || "all");
+  const [vendorFilter, setVendorFilter] = useState<string>(searchParams?.get("vendorFilter") || "all");
+
+  const initialMinPrice = searchParams?.get("minPrice") ? Number(searchParams.get("minPrice")) : "";
+  const initialMaxPrice = searchParams?.get("maxPrice") ? Number(searchParams.get("maxPrice")) : "";
+
+  const [minPrice, setMinPrice] = useState<number | "">(initialMinPrice);
+  const [maxPrice, setMaxPrice] = useState<number | "">(initialMaxPrice);
+
   const [loading, setLoading] = useState(true);
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [exporting, setExporting] = useState(false);
+
+  // Sync state changes to URL
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams ? searchParams.toString() : "");
+
+    if (searchSku) params.set("searchSku", searchSku);
+    else params.delete("searchSku");
+
+    if (statusFilter !== "all") params.set("statusFilter", statusFilter);
+    else params.delete("statusFilter");
+
+    if (featuredFilter !== "all") params.set("featuredFilter", featuredFilter);
+    else params.delete("featuredFilter");
+
+    if (vendorFilter !== "all") params.set("vendorFilter", vendorFilter);
+    else params.delete("vendorFilter");
+
+    if (minPrice !== "") params.set("minPrice", minPrice.toString());
+    else params.delete("minPrice");
+
+    if (maxPrice !== "") params.set("maxPrice", maxPrice.toString());
+    else params.delete("maxPrice");
+
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }, [searchSku, statusFilter, featuredFilter, vendorFilter, minPrice, maxPrice, pathname, router, searchParams]);
 
   const hasActiveFilters =
     searchSku.trim() ||
@@ -251,8 +285,8 @@ export default function CategoryProducts() {
       return null;
     }
     const firstVariant = product.variants[0];
-    return firstVariant.image_urls && firstVariant.image_urls.length > 0 
-      ? firstVariant.image_urls[0] 
+    return firstVariant.image_urls && firstVariant.image_urls.length > 0
+      ? firstVariant.image_urls[0]
       : null;
   };
 
@@ -517,11 +551,10 @@ export default function CategoryProducts() {
           <button
             onClick={handleExportToExcel}
             disabled={exporting || products.length === 0}
-            className={`flex items-center gap-2 py-2 px-4 rounded-lg transition-colors cursor-pointer border ${
-              exporting || products.length === 0
-                ? "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed"
-                : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300"
-            }`}
+            className={`flex items-center gap-2 py-2 px-4 rounded-lg transition-colors cursor-pointer border ${exporting || products.length === 0
+              ? "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed"
+              : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300"
+              }`}
           >
             {exporting ? (
               <svg className="h-4 w-4 animate-spin text-[#F53F7A]" viewBox="0 0 24 24">
@@ -710,7 +743,7 @@ export default function CategoryProducts() {
                 )}
               </div>
             </div>
-            <table className="min-w-full divide-y divide-gray-200">
+            <table className="min-w-full divide-y divide-gray-200 hidden md:table">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -747,112 +780,243 @@ export default function CategoryProducts() {
                     </td>
                   </tr>
                 ) : (
-                filteredProducts.map((product, index) => (
-                  <tr key={product.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-medium">
-                      {index + 1}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10">
-                          {getFirstImage(product) ? (
-                            <img
-                              className="h-10 w-10 rounded-lg object-cover"
-                              src={getFirstImage(product)!}
-                              alt={product.name}
-                            />
-                          ) : (
-                            <div className="h-10 w-10 rounded-lg bg-gray-200 flex items-center justify-center">
-                              <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                              </svg>
-                            </div>
-                          )}
-                        </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">{product.name}</div>
-                          <div className="text-sm text-gray-500 max-w-xs truncate">
-                            {product.description || "No description"}
+                  filteredProducts.map((product, index) => (
+                    <tr key={product.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-medium">
+                        {index + 1}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 h-10 w-10">
+                            {getFirstImage(product) ? (
+                              <img
+                                className="h-10 w-10 rounded-lg object-cover"
+                                src={getFirstImage(product)!}
+                                alt={product.name}
+                              />
+                            ) : (
+                              <div className="h-10 w-10 rounded-lg bg-gray-200 flex items-center justify-center">
+                                <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                              </div>
+                            )}
+                          </div>
+                          <div className="ml-4">
+                            <div className="text-sm font-medium text-gray-900">{product.name}</div>
+                            <div className="text-sm text-gray-500 line-clamp-1 max-w-[200px]">{product.description}</div>
                           </div>
                         </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {getFirstSku(product)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
+                        {getSmallestPrice(product) ? `₹${getSmallestPrice(product)}` : '-'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${product.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                          {product.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {product.vendor_name || '-'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {product.featured_type === 'best_seller' && (
+                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
+                            Best Seller
+                          </span>
+                        )}
+                        {product.featured_type === 'trending' && (
+                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                            Trending
+                          </span>
+                        )}
+                        {!product.featured_type && '-'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => toggleProductStatus(product)}
+                            className={`p-1 rounded-md transition-colors ${product.is_active
+                              ? 'text-red-600 hover:bg-red-50'
+                              : 'text-green-600 hover:bg-green-50'
+                              }`}
+                            title={product.is_active ? "Deactivate" : "Activate"}
+                          >
+                            {product.is_active ? (
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                              </svg>
+                            ) : (
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                            )}
+                          </button>
+                          <button
+                            onClick={() => handleEditProduct(product)}
+                            className="p-1 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded-md transition-colors"
+                            title="Edit"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => handleDeleteProduct(product)}
+                            className="p-1 text-red-600 hover:text-red-900 hover:bg-red-50 rounded-md transition-colors"
+                            title="Delete"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+
+            {/* Mobile & Tablet Tile View (Always Visible on smaller screens, replaced table for consistent look if desired, but here replacing hidden class logic to allow grid everywhere if needed, or just mobile. 
+                User asked for "tile view for all products", implying grid view might be better for Desktop too. 
+                Let's implement a responsive Grid view that REPLACES the table entirely, as per "I also want the same tile view for all products" request which likely means ALL screens. 
+            */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6 p-1">
+              {filteredProducts.map((product) => (
+                <div
+                  key={product.id}
+                  className="bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden group flex flex-col"
+                >
+                  {/* Product Image & Badge */}
+                  <div className="relative aspect-[4/3] bg-gray-100 overflow-hidden">
+                    {getFirstImage(product) ? (
+                      <img
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        src={getFirstImage(product)!}
+                        alt={product.name}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-300">
+                        <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {getFirstSku(product)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-bold text-[#F53F7A]">
-                        ₹{getSmallestPrice(product)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        product.is_active
-                          ? "bg-green-100 text-green-800"
-                          : "bg-red-100 text-red-800"
-                      }`}>
-                        {product.is_active ? "Active" : "Inactive"}
+                    )}
+
+                    {/* Status Badge */}
+                    <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
+                      <span className={`px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md shadow-sm ${product.is_active ? 'bg-white/90 text-green-700 backdrop-blur-sm' : 'bg-white/90 text-red-700 backdrop-blur-sm'
+                        }`}>
+                        {product.is_active ? 'Active' : 'Inactive'}
                       </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {product.vendor_name || "-"}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {product.featured_type ? (product.featured_type === "best_seller" ? "Best Seller" : "Trending") : "None"}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center justify-end gap-3">
+                      {product.featured_type === 'best_seller' && (
+                        <span className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md shadow-sm bg-purple-500/90 text-white backdrop-blur-sm">
+                          Best Seller
+                        </span>
+                      )}
+                      {product.featured_type === 'trending' && (
+                        <span className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md shadow-sm bg-blue-500/90 text-white backdrop-blur-sm">
+                          Trending
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Product Info */}
+                  <div className="p-4 flex-1 flex flex-col">
+                    <div className="mb-2">
+                      <h3 className="font-semibold text-gray-900 line-clamp-1 mb-0.5" title={product.name}>
+                        {product.name}
+                      </h3>
+                      <div className="flex items-center gap-2 text-xs text-gray-500 font-mono">
+                        <span className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">
+                          {getFirstSku(product)}
+                        </span>
+                        {product.vendor_name && (
+                          <span className="truncate max-w-[100px]" title={product.vendor_name}>
+                            • {product.vendor_name}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="mt-auto pt-3 border-t border-gray-50 flex items-center justify-between">
+                      <div>
+                        {getSmallestPrice(product) ? (
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-sm font-bold text-gray-900">₹{getSmallestPrice(product)}</span>
+                            {computeMaxPrice(product.variants || []) !== getSmallestPrice(product) && (
+                              <span className="text-xs text-gray-400 font-medium">
+                                - {computeMaxPrice(product.variants || [])}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-sm text-gray-400 italic">No price</span>
+                        )}
+                        <div className="text-[10px] text-gray-400 mt-0.5">
+                          {computeTotalQuantity(product.variants || [])} units in stock
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => toggleProductStatus(product)}
+                          className={`p-2 rounded-lg transition-colors ${product.is_active
+                              ? 'text-gray-400 hover:text-red-600 hover:bg-red-50'
+                              : 'text-green-600 hover:bg-green-50'
+                            }`}
+                          title={product.is_active ? "Deactivate" : "Activate"}
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.636 5.636a9 9 0 0112.728 0A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                          </svg>
+                        </button>
                         <button
                           onClick={() => handleEditProduct(product)}
-                          className="flex items-center gap-1.5 text-[#F53F7A] hover:text-[#F53F7A]/80 font-medium px-2 py-1 rounded-md hover:bg-[#F53F7A]/10 transition-colors"
+                          className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Edit"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                           </svg>
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => toggleProductStatus(product)}
-                          className={`flex items-center gap-1.5 font-medium px-2 py-1 rounded-md transition-colors ${
-                            product.is_active
-                              ? "text-orange-600 hover:text-orange-800 hover:bg-orange-50"
-                              : "text-green-600 hover:text-green-800 hover:bg-green-50"
-                          }`}
-                        >
-                          {product.is_active ? (
-                            <>
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L18.364 5.636M5.636 18.364l12.728-12.728" />
-                              </svg>
-                              Deactivate
-                            </>
-                          ) : (
-                            <>
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                              </svg>
-                              Activate
-                            </>
-                          )}
                         </button>
                         <button
                           onClick={() => handleDeleteProduct(product)}
-                          className="flex items-center gap-1.5 text-red-600 hover:text-red-800 font-medium px-2 py-1 rounded-md hover:bg-red-50 transition-colors"
+                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Delete"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                           </svg>
-                          Delete
                         </button>
                       </div>
-                    </td>
-                  </tr>
-                )))}
-              </tbody>
-            </table>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {/* Add New Product Card (at the end of grid) */}
+              <button
+                onClick={handleAddProduct}
+                className="min-h-[300px] rounded-xl border-2 border-dashed border-gray-200 hover:border-[#F53F7A]/50 hover:bg-[#F53F7A]/5 transition-all duration-200 flex flex-col items-center justify-center gap-4 group"
+              >
+                <div className="w-16 h-16 rounded-full bg-gray-50 group-hover:bg-white group-hover:shadow-md flex items-center justify-center transition-all duration-200">
+                  <svg className="w-8 h-8 text-gray-400 group-hover:text-[#F53F7A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                </div>
+                <span className="font-medium text-gray-500 group-hover:text-[#F53F7A]">Add New Product</span>
+              </button>
+            </div>
           </div>
         )}
       </div>
     </div>
   );
-} 
+}

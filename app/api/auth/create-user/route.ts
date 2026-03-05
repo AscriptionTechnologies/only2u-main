@@ -31,6 +31,7 @@ export async function POST(request: NextRequest) {
       email,
       password,
       phone,
+      email_confirm: true,
     });
 
     if (authError) {
@@ -89,9 +90,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      user: { id: authData.user.id, email, name, role } 
+    return NextResponse.json({
+      success: true,
+      user: { id: authData.user.id, email, name, role }
     });
 
   } catch (error) {

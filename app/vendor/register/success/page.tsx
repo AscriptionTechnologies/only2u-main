@@ -23,12 +23,20 @@ export default function RegistrationSuccessPage() {
         <p className="text-sm text-gray-500 mb-6">
           You will receive an email notification once your application is reviewed. This process typically takes 2-3 business days.
         </p>
-        <button
-          onClick={() => router.push("/")}
-          className="w-full py-2 bg-[#F53F7A] text-white rounded-lg hover:bg-[#F53F7A]/90"
-        >
-          Return to Home
-        </button>
+        <div className="flex flex-col gap-3">
+          <button
+            onClick={() => router.push("/vendor/login")}
+            className="w-full py-2 bg-[#F53F7A] text-white rounded-lg hover:bg-[#F53F7A]/90"
+          >
+            Go to Vendor Login
+          </button>
+          <button
+            onClick={() => router.push("/")}
+            className="w-full py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+          >
+            Return to Home
+          </button>
+        </div>
       </div>
     </div>
   );

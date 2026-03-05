@@ -87,87 +87,90 @@ const LoginPage = () => {
 
   if (isCheckingUser) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <Loader2 className="animate-spin h-6 w-6 text-[#000000]" />
+      <div className="flex justify-center items-center h-screen bg-gray-50">
+        <Loader2 className="animate-spin h-8 w-8 text-[#F53F7A]" />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col md:flex-row-reverse w-full bg-white h-screen p-1 justify-center">
-      {/* Login Form */}
-      <div className="md:w-2/4 md:h-full h-3/4 flex justify-center items-center p-8">
-        <div className="w-full bg-white rounded-xl p-8 md:max-w-md space-y-6 md:shadow-none shadow shadow-[#343434]/30">
-          <div className="flex justify-center space-x-4 items-center">
+    <div className="flex min-h-screen w-full items-center justify-center p-4 auth-gradient relative overflow-hidden">
+      {/* Decorative blobs */}
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-pink-200/40 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-200/40 rounded-full blur-[100px] pointer-events-none" />
+
+      <div className="w-full max-w-md glass-card rounded-2xl p-8 md:p-10 shadow-2xl relative z-10 transition-all duration-300 hover:shadow-pink-500/10">
+        <div className="flex flex-col items-center mb-8 space-y-2">
+          <div className="transform hover:scale-105 transition-transform duration-300">
             <Logo />
-            <h2 className="text-2xl font-bold text-[#000000] tracking-tight"></h2>
           </div>
-
-          <p className="text-center text-sm text-[#343434] mb-4">
-            Please log in to access your dashboard.
+          <h1 className="text-2xl font-bold text-gray-800 mt-4 tracking-tight">Welcome Back</h1>
+          <p className="text-gray-500 text-sm text-center">
+            Sign in to access your admin dashboard
           </p>
+        </div>
 
-          <div>
-            <label htmlFor="email" className="text-[#343434] font-medium">
-              Email
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <label htmlFor="email" className="text-sm font-semibold text-gray-700 ml-1">
+              Email Address
             </label>
             <input
               type="email"
               id="email"
-              placeholder="Email Address"
+              placeholder="name@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full mt-2 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F53F7A] transition-all"
+              className="w-full px-4 py-3 bg-gray-50/50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F53F7A]/20 focus:border-[#F53F7A] transition-all duration-200"
             />
           </div>
 
-          <div>
-            <label htmlFor="password" className="text-[#343434] font-medium">
+          <div className="space-y-2">
+            <label htmlFor="password" className="text-sm font-semibold text-gray-700 ml-1">
               Password
             </label>
-            <div className="relative flex items-center">
+            <div className="relative">
               <input
                 type={passwordVisible ? "text" : "password"}
                 id="password"
-                placeholder="Enter Password"
+                placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full mt-2 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#F53F7A] transition-all"
+                className="w-full px-4 py-3 bg-gray-50/50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F53F7A]/20 focus:border-[#F53F7A] transition-all duration-200 pr-10"
               />
-              <Eye
-                className="absolute right-3 top-[20px] text-[#888] cursor-pointer"
+              <button
+                type="button"
                 onClick={togglePasswordVisibility}
-              />
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors p-1"
+              >
+                {passwordVisible ? <Eye size={20} /> : <Eye size={20} className="stroke-[2.5px]" />}
+              </button>
             </div>
           </div>
-
 
           <button
             onClick={handleLogin}
             disabled={isLoading}
-            className="w-full py-3 bg-gradient-to-r from-[#F53F7A] to-[#ff784e] text-white font-semibold rounded-lg hover:opacity-90 transition duration-300 flex items-center justify-center"
+            className="w-full py-3.5 bg-gradient-to-r from-[#F53F7A] to-[#ff784e] text-white font-semibold rounded-xl hover:opacity-95 hover:shadow-lg hover:shadow-pink-500/30 transform active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 group"
           >
             {isLoading ? (
               <Loader2 className="animate-spin h-5 w-5 text-white" />
             ) : (
-              "Login"
+              <>
+                Sign In
+              </>
             )}
           </button>
         </div>
+
+        <div className="mt-8 text-center">
+          <p className="text-xs text-gray-400">
+            &copy; {new Date().getFullYear()} Only2U. All rights reserved.
+          </p>
+        </div>
       </div>
 
-      {/* Side Image */}
-      {/* <div className="hidden md:flex w-3/4 h-full relative items-center justify-center overflow-hidden rounded-r-3xl">
-        <Image
-          src="/help-needy.jpg"
-          alt="login page image"
-          fill
-          className="object-cover rounded-r-3xl"
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#000000]/70 rounded-r-3xl" />
-      </div> */}
-
-      <ToastContainer />
+      <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} newestOnTop closeOnClick rtl={false} pauseOnFocusLoss draggable pauseOnHover theme="light" />
     </div>
   );
 };

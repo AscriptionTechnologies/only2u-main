@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { supabase } from "../../../lib/supabase";
 import { uploadFile } from "../../../lib/uploadUtils";
 import { toast } from "react-toastify";
@@ -18,13 +19,13 @@ export default function VendorRegistrationPage() {
     business_type: "",
     gstin: "",
     pan: "",
-    
+
     // Contact Information
     contact_name: "",
     email: "",
     phone: "",
     alternate_phone: "",
-    
+
     // Address
     address_line1: "",
     address_line2: "",
@@ -32,13 +33,13 @@ export default function VendorRegistrationPage() {
     state: "",
     pincode: "",
     country: "India",
-    
+
     // Bank Details
     bank_name: "",
     account_number: "",
     ifsc_code: "",
     account_holder_name: "",
-    
+
     // Additional
     business_description: "",
     years_in_business: "",
@@ -168,9 +169,8 @@ export default function VendorRegistrationPage() {
           <div className="flex items-center justify-between">
             {[1, 2, 3, 4].map((step) => (
               <div key={step} className="flex items-center flex-1">
-                <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${
-                  currentStep >= step ? "bg-[#F53F7A] border-[#F53F7A] text-white" : "border-gray-300 text-gray-400"
-                }`}>
+                <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${currentStep >= step ? "bg-[#F53F7A] border-[#F53F7A] text-white" : "border-gray-300 text-gray-400"
+                  }`}>
                   {step}
                 </div>
                 {step < 4 && (
@@ -521,6 +521,15 @@ export default function VendorRegistrationPage() {
                 {loading || uploadingDocs ? "Submitting..." : "Submit Registration"}
               </button>
             )}
+          </div>
+
+          <div className="mt-8 text-center pt-6 border-t border-gray-100">
+            <p className="text-sm text-gray-600">
+              Already have a vendor account?{" "}
+              <Link href="/vendor/login" className="text-[#F53F7A] font-semibold hover:underline">
+                Login here
+              </Link>
+            </p>
           </div>
         </div>
       </div>

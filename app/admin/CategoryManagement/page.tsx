@@ -140,6 +140,7 @@ type CategoryStats = {
   sizeCounts: { sizeName: string; count: number }[];
 };
 
+// Force rebuild
 export default function CategoryManagement() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -1369,146 +1370,167 @@ export default function CategoryManagement() {
 
   return (
     <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Inventory Management</h1>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleExport}
-            disabled={exporting || currentDatasetCount === 0}
-            className={`flex items-center gap-2 py-2 px-4 rounded-lg border transition-colors ${exporting || currentDatasetCount === 0
-              ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
-              : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300'
-              }`}
-          >
-            {exporting ? (
-              <svg className="h-4 w-4 animate-spin text-[#F53F7A]" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3.5-3.5L12 0v4a8 8 0 00-8 8h4z"></path>
-              </svg>
-            ) : (
-              <svg className="w-4 h-4 text-[#F53F7A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M8 12l4 4m0 0l4-4m-4 4V4" />
-              </svg>
-            )}
-            {exporting ? 'Preparing...' : exportLabel}
-          </button>
+      {/* Header */}
+      <div className="bg-white rounded-2xl shadow-sm p-6 mb-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600">
+              Inventory Management
+            </h1>
+            <p className="text-sm text-gray-500 mt-1">Manage your categories, products, and home screen layout.</p>
+          </div>
 
-          {/* Export SKU Button with Dropdown */}
-          <div className="relative">
+          <div className="flex flex-wrap items-center gap-3">
             <button
-              onClick={() => setShowSkuExportMenu(!showSkuExportMenu)}
-              disabled={exportingSku}
-              className={`flex items-center gap-2 py-2 px-4 rounded-lg border transition-colors ${exportingSku
-                ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
-                : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300'
+              onClick={handleExport}
+              disabled={exporting || currentDatasetCount === 0}
+              className={`flex items-center gap-2 py-2.5 px-5 rounded-xl border font-medium transition-all shadow-sm ${exporting || currentDatasetCount === 0
+                ? 'bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed'
+                : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 hover:shadow'
                 }`}
             >
-              {exportingSku ? (
+              {exporting ? (
                 <svg className="h-4 w-4 animate-spin text-[#F53F7A]" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3.5-3.5L12 0v4a8 8 0 00-8 8h4z"></path>
                 </svg>
               ) : (
-                <svg className="w-4 h-4 text-[#F53F7A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                <svg className="w-5 h-5 text-[#F53F7A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M8 12l4 4m0 0l4-4m-4 4V4" />
                 </svg>
               )}
-              {exportingSku ? 'Exporting...' : 'Export for Shopify'}
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
+              {exporting ? 'Preparing...' : exportLabel}
             </button>
 
-            {showSkuExportMenu && (
-              <>
-                <div
-                  className="fixed inset-0 z-10"
-                  onClick={() => setShowSkuExportMenu(false)}
-                ></div>
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
-                  <button
-                    onClick={exportSkusToTxt}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 rounded-t-lg"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    Export as TXT
-                  </button>
-                  <button
-                    onClick={exportSkusToCsv}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 rounded-b-lg"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    Export as Shopify CSV
-                  </button>
-                </div>
-              </>
+            {/* Export SKU Button with Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setShowSkuExportMenu(!showSkuExportMenu)}
+                disabled={exportingSku}
+                className={`flex items-center gap-2 py-2.5 px-5 rounded-xl border font-medium transition-all shadow-sm ${exportingSku
+                  ? 'bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed'
+                  : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 hover:shadow'
+                  }`}
+              >
+                {exportingSku ? (
+                  <svg className="h-4 w-4 animate-spin text-[#F53F7A]" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3.5-3.5L12 0v4a8 8 0 00-8 8h4z"></path>
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5 text-[#F53F7A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                )}
+                {exportingSku ? 'Exporting...' : 'Export for Shopify'}
+                <svg className={`w-4 h-4 transition-transform ${showSkuExportMenu ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {showSkuExportMenu && (
+                <>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setShowSkuExportMenu(false)}
+                  ></div>
+                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 z-20 overflow-hidden ring-1 ring-black ring-opacity-5">
+                    <div className="p-1">
+                      <button
+                        onClick={exportSkusToTxt}
+                        className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 rounded-lg transition-colors"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <p className="font-medium">Export as TXT</p>
+                          <p className="text-xs text-gray-500">Simple text file format</p>
+                        </div>
+                      </button>
+                      <button
+                        onClick={exportSkusToCsv}
+                        className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 rounded-lg transition-colors"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-green-50 flex items-center justify-center text-green-600">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <p className="font-medium">Shopify CSV</p>
+                          <p className="text-xs text-gray-500">Formatted for Shopify import</p>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {viewMode === 'categories' && (
+              <button
+                className="flex items-center gap-2 py-2.5 px-5 bg-gradient-to-r from-[#F53F7A] to-[#f96a97] text-white rounded-xl hover:shadow-lg hover:shadow-pink-500/30 transition-all cursor-pointer font-medium"
+                onClick={handleAddCategory}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                Add Category
+              </button>
             )}
           </div>
-
-          {viewMode === 'categories' && (
-            <button
-              className="flex items-center gap-2 py-2 px-4 bg-[#F53F7A] text-white rounded-lg hover:bg-[#F53F7A]/90 transition-colors cursor-pointer"
-              onClick={handleAddCategory}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
-              Add Category
-            </button>
-          )}
         </div>
-      </div>
 
-      {/* View Mode Tabs */}
-      <div className="mb-6">
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8">
+        {/* View Mode Tabs - Redesigned as Pills */}
+        <div className="mt-8">
+          <div className="bg-gray-100/50 p-1.5 rounded-2xl inline-flex flex-wrap w-full md:w-auto">
             <button
               onClick={() => setViewMode('categories')}
-              className={`${viewMode === 'categories'
-                ? 'border-[#F53F7A] text-[#F53F7A]'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-2`}
+              className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${viewMode === 'categories'
+                ? 'bg-white text-[#F53F7A] shadow-sm ring-1 ring-gray-200'
+                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'
+                }`}
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
               </svg>
               Categories
               {categories.length > 0 && (
-                <span className="bg-gray-100 text-gray-800 text-xs font-semibold px-2 py-0.5 rounded-full">
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${viewMode === 'categories' ? 'bg-[#F53F7A]/10' : 'bg-gray-200 text-gray-600'}`}>
                   {categories.length}
                 </span>
               )}
             </button>
+
             <button
               onClick={() => setViewMode('section-order')}
-              className={`${viewMode === 'section-order'
-                ? 'border-[#F53F7A] text-[#F53F7A]'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-2`}
+              className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${viewMode === 'section-order'
+                ? 'bg-white text-[#F53F7A] shadow-sm ring-1 ring-gray-200'
+                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'
+                }`}
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
               </svg>
               Home Screen Order
             </button>
+
             <button
               onClick={() => setViewMode('featured')}
-              className={`${viewMode === 'featured'
-                ? 'border-[#F53F7A] text-[#F53F7A]'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-2`}
+              className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${viewMode === 'featured'
+                ? 'bg-white text-[#F53F7A] shadow-sm ring-1 ring-gray-200'
+                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'
+                }`}
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
               </svg>
               Featured Products
             </button>
-          </nav>
+          </div>
         </div>
       </div>
       {/* Home Screen Section Order View */}
@@ -1770,7 +1792,7 @@ export default function CategoryManagement() {
             </div>
           </div>
 
-          {/* Featured Products Table */}
+          {/* Featured Products Table and Cards */}
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200 bg-blue-50">
               <div className="flex items-center gap-2">
@@ -1782,7 +1804,9 @@ export default function CategoryManagement() {
                 </p>
               </div>
             </div>
-            <div className="overflow-x-auto">
+
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
               <DndContext
                 sensors={sensors}
                 collisionDetection={closestCenter}
@@ -1842,6 +1866,42 @@ export default function CategoryManagement() {
                     )}
                   </tbody>
                 </table>
+              </DndContext>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="md:hidden">
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleProductDragEnd}
+              >
+                {loadingProducts ? (
+                  <div className="text-center py-10 text-gray-400">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#F53F7A] mx-auto mb-2"></div>
+                    Loading products...
+                  </div>
+                ) : products.length === 0 ? (
+                  <div className="text-center py-10 text-gray-400">
+                    No featured products found.
+                  </div>
+                ) : (
+                  <SortableContext
+                    items={products.map(p => p.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <div className="space-y-4 p-4">
+                      {products.map((product) => (
+                        <SortableProductCardMobile
+                          key={product.id}
+                          product={product}
+                          onUpdateFeatureType={updateProductFeatureType}
+                          onEditProduct={handleEditProduct}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                )}
               </DndContext>
             </div>
           </div>
@@ -2091,18 +2151,18 @@ function SortableFeatureSectionCard({
       </div>
 
       {/* Section Info */}
-      <div className="flex-1">
-        <h4 className="text-lg font-bold mb-1">{section.title}</h4>
-        <p className="text-sm opacity-80">
+      <div className="flex-1 min-w-0">
+        <h4 className="text-base md:text-lg font-bold mb-1 truncate">{section.title}</h4>
+        <p className="text-xs md:text-sm opacity-80 line-clamp-2 md:line-clamp-1">
           {section.section_type === 'best_seller' && 'Products marked as Best Sellers'}
           {section.section_type === 'trending' && 'Products marked as Trending Now'}
           {section.section_type === 'categories' && 'All product categories'}
         </p>
-        <div className="mt-2 flex items-center gap-2">
-          <span className="text-xs font-semibold px-2 py-1 bg-white/50 rounded">
-            Position: #{section.display_order + 1}
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <span className="text-[10px] md:text-xs font-semibold px-2 py-1 bg-white/50 rounded">
+            Pos: #{section.display_order + 1}
           </span>
-          <span className={`text-xs font-semibold px-2 py-1 rounded ${section.is_active ? 'bg-green-600 text-white' : 'bg-gray-400 text-white'
+          <span className={`text-[10px] md:text-xs font-semibold px-2 py-1 rounded ${section.is_active ? 'bg-green-600 text-white' : 'bg-gray-400 text-white'
             }`}>
             {section.is_active ? 'Active' : 'Hidden'}
           </span>
@@ -2113,25 +2173,25 @@ function SortableFeatureSectionCard({
       <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
         <button
           onClick={() => onToggleVisibility(section.id, section.is_active)}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${section.is_active
+          className={`flex items-center gap-1 md:gap-2 px-3 md:px-4 py-2 rounded-lg font-medium transition-colors text-xs md:text-sm ${section.is_active
             ? 'bg-orange-500 text-white hover:bg-orange-600'
             : 'bg-green-500 text-white hover:bg-green-600'
             }`}
         >
           {section.is_active ? (
             <>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 md:block hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
               </svg>
-              Hide
+              <span>Hide</span>
             </>
           ) : (
             <>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 md:block hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
               </svg>
-              Show
+              <span>Show</span>
             </>
           )}
         </button>
@@ -2177,123 +2237,125 @@ function SortableCategoryCard({
     <div
       ref={setNodeRef}
       style={style}
-      className="bg-white shadow rounded-xl p-4 flex items-center gap-4 hover:shadow-lg transition-shadow"
+      className="bg-white shadow rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center gap-4 hover:shadow-lg transition-shadow"
     >
-      {/* Drag Handle */}
-      <div
-        {...attributes}
-        {...listeners}
-        className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
-        title="Drag to reorder"
-      >
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-        </svg>
-      </div>
+      {/* Mobile Top Row: Drag + Image + Title */}
+      <div className="flex items-center gap-4 w-full md:w-auto">
+        {/* Drag Handle */}
+        <div
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
+          title="Drag to reorder"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+          </svg>
+        </div>
 
-      {/* Category Content */}
-      <div
-        className="flex items-center gap-4 flex-1 cursor-pointer"
-        onClick={() => onCategoryClick(category)}
-      >
+        {/* Category Image */}
         {category.image_url && (
           <img
             src={category.image_url}
             alt={category.name}
-            className="w-16 h-16 object-cover rounded-lg border"
+            className="w-12 h-12 md:w-16 md:h-16 object-cover rounded-lg border flex-shrink-0"
           />
         )}
-        <div className="flex-1">
+
+        {/* Mobile Title (visible only on small screens) */}
+        <div className="md:hidden flex-1 min-w-0">
+          <h3 className="text-base font-semibold text-gray-800 truncate">
+            {category.name}
+          </h3>
+          <span className={`inline-block px-2 py-0.5 text-[10px] rounded-full font-semibold whitespace-nowrap mt-1 ${category.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+            {category.is_active ? 'Active' : 'Inactive'}
+          </span>
+        </div>
+      </div>
+
+      {/* Category Content (Desktop & Remaining Mobile Info) */}
+      <div
+        className="flex flex-col md:flex-row items-start md:items-center gap-4 flex-1 cursor-pointer w-full"
+        onClick={() => onCategoryClick(category)}
+      >
+        <div className="flex-1 w-full min-w-0">
           <div className="flex items-start justify-between gap-4 mb-2">
-            <div className="flex-1">
-              <h3 className="text-lg font-semibold text-gray-800">
+            <div className="flex-1 min-w-0">
+              <h3 className="text-lg font-semibold text-gray-800 hidden md:block">
                 {category.name}
               </h3>
-              <p className="text-sm text-gray-600 mt-1">{category.description}</p>
+              <p className="text-sm text-gray-600 mt-1 line-clamp-2">{category.description}</p>
             </div>
-            <span className={`inline-block px-3 py-1 text-xs rounded-full font-semibold whitespace-nowrap ${category.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+            <span className={`hidden md:inline-block px-3 py-1 text-xs rounded-full font-semibold whitespace-nowrap ${category.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
               {category.is_active ? 'Active' : 'Inactive'}
             </span>
           </div>
-          {stats && (
-            <div className="mt-3 space-y-2">
-              <div className="flex items-center gap-2">
-                <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                </svg>
-                <span className="text-sm font-medium text-gray-700">
-                  Total Products: <span className="text-blue-600 font-semibold">{stats.totalProducts}</span>
-                </span>
-              </div>
-              {stats.sizeCounts.length > 0 && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-medium text-gray-600">Size/Variant Count:</span>
-                  {stats.sizeCounts.map((sizeCount, idx) => (
-                    <span
-                      key={idx}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-md font-medium bg-gray-100 text-gray-700 border border-gray-200"
-                      title={`${sizeCount.count} variant${sizeCount.count !== 1 ? 's' : ''} in size ${sizeCount.sizeName}`}
-                    >
-                      <span className="font-semibold">{sizeCount.sizeName}</span>
-                      <span className="text-gray-500">×</span>
-                      <span className="text-blue-600 font-bold">{sizeCount.count}</span>
-                    </span>
-                  ))}
-                </div>
-              )}
-              {stats.sizeCounts.length === 0 && stats.totalProducts > 0 && (
-                <span className="text-xs text-gray-500 italic">No variants found</span>
-              )}
+          <div className="flex flex-wrap gap-4 text-sm text-gray-500">
+            <div className="flex items-center gap-1">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+              </svg>
+              <span>{stats?.totalProducts || 0} Products</span>
             </div>
-          )}
+            {category.hsn_code && (
+              <div className="flex items-center gap-1">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span>HSN: {category.hsn_code}</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Action Buttons */}
-      <div className="flex gap-3 items-center" onClick={(e) => e.stopPropagation()}>
+      <div className="flex gap-3 items-center w-full md:w-auto justify-between md:justify-start pt-2 md:pt-0 border-t md:border-t-0 border-gray-100" onClick={(e) => e.stopPropagation()}>
         <button
           onClick={() => onToggleStatus(category)}
           className={`flex items-center gap-1.5 font-medium px-2 py-1 rounded-md transition-colors ${category.is_active
-            ? "text-orange-600 hover:text-orange-800 hover:bg-orange-50"
-            : "text-green-600 hover:text-green-800 hover:bg-green-50"
+            ? 'text-red-600 hover:bg-red-50'
+            : 'text-green-600 hover:bg-green-50'
             }`}
-          title={category.is_active ? 'Deactivate' : 'Activate'}
+          title={category.is_active ? "Deactivate Category" : "Activate Category"}
         >
           {category.is_active ? (
             <>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L18.364 5.636M5.636 18.364l12.728-12.728" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
               </svg>
-              Deactivate
+              <span className="md:hidden">Deactivate</span>
             </>
           ) : (
             <>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              Activate
+              <span className="md:hidden">Activate</span>
             </>
           )}
         </button>
+
         <button
           onClick={() => onEdit(category)}
-          className="flex items-center gap-1.5 text-[#F53F7A] hover:text-[#F53F7A]/80 font-medium px-2 py-1 rounded-md hover:bg-[#F53F7A]/10 transition-colors"
-          title="Edit"
+          className="flex items-center gap-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1 rounded-md transition-colors font-medium"
+          title="Edit Category"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
           </svg>
-          Edit
+          <span className="md:hidden">Edit</span>
         </button>
+
         <button
           onClick={() => onDelete(category)}
-          className="flex items-center gap-1.5 text-red-600 hover:text-red-800 font-medium px-2 py-1 rounded-md hover:bg-red-50 transition-colors"
-          title="Delete"
+          className="flex items-center gap-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 px-2 py-1 rounded-md transition-colors font-medium"
+          title="Delete Category"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
           </svg>
-          Delete
+          <span className="md:hidden">Delete</span>
         </button>
       </div>
     </div>
@@ -2394,5 +2456,97 @@ function SortableProductRow({
         </button>
       </td>
     </tr>
+  );
+}
+
+// Mobile Sortable Product Card Component
+function SortableProductCardMobile({
+  product,
+  onUpdateFeatureType,
+  onEditProduct,
+}: SortableProductRowProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: product.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="bg-white border rounded-lg p-4 shadow-sm">
+      <div className="flex items-start gap-4">
+        {/* Drag Handle */}
+        <div
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 transition-colors mt-1"
+          title="Drag to reorder"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+          </svg>
+        </div>
+
+        <div className="flex-1 min-w-0 space-y-2">
+          {/* Header: Name and Status */}
+          <div className="flex justify-between items-start gap-2">
+            <h4 className="font-semibold text-gray-900 line-clamp-2">{product.name}</h4>
+            <span
+              className={`inline-flex px-2 py-0.5 text-[10px] font-semibold rounded-full whitespace-nowrap ${product.is_active
+                ? 'bg-green-100 text-green-800'
+                : 'bg-red-100 text-red-800'
+                }`}
+            >
+              {product.is_active ? 'Active' : 'Inactive'}
+            </span>
+          </div>
+
+          {/* Details: Category */}
+          <div className="text-xs text-gray-500">
+            <span className="font-medium text-gray-700">Category:</span> {getProductCategoryName(product)}
+          </div>
+
+          {/* Feature Type Select */}
+          <div>
+            <select
+              value={product.featured_type || ''}
+              onChange={(e) => {
+                const value = e.target.value;
+                onUpdateFeatureType(
+                  product.id,
+                  value === '' ? null : value as "trending" | "best_seller"
+                );
+              }}
+              className="w-full text-xs border border-gray-300 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#F53F7A] focus:border-transparent bg-gray-50"
+            >
+              <option value="">No Feature</option>
+              <option value="trending">Trending Now</option>
+              <option value="best_seller">Best Seller</option>
+            </select>
+          </div>
+
+          {/* Actions */}
+          <div className="flex justify-end pt-2 border-t border-gray-100">
+            <button
+              onClick={() => onEditProduct(product.id)}
+              className="flex items-center gap-1 text-xs text-[#F53F7A] font-medium"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
+              Edit Product
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

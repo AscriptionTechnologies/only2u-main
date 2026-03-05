@@ -135,11 +135,11 @@ const UserMang = () => {
 
   const handleAddUser = () => {
     setEditingUser(null);
-    setFormData({ 
-      name: "", 
-      email: "", 
-      password: "", 
-      role: "user", 
+    setFormData({
+      name: "",
+      email: "",
+      password: "",
+      role: "user",
       is_active: true,
       location: "",
       phone: "",
@@ -277,10 +277,10 @@ const UserMang = () => {
   });
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
+    <div className="p-4 md:p-6 pb-20 md:pb-6">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
         <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
           <button
             onClick={async () => {
               if (filteredUsers.length === 0) {
@@ -303,9 +303,9 @@ const UserMang = () => {
                     last_sign_in_at: user.last_sign_in_at ?? user.last_login ?? null,
                     vendor: user.vendorBusiness
                       ? {
-                          business_name: user.vendorBusiness,
-                          is_verified: user.vendorVerified ?? false,
-                        }
+                        business_name: user.vendorBusiness,
+                        is_verified: user.vendorVerified ?? false,
+                      }
                       : null,
                     orders_count: user.orders_count ?? 0,
                     total_spent: user.total_spent ?? 0,
@@ -324,11 +324,10 @@ const UserMang = () => {
               }
             }}
             disabled={exporting || filteredUsers.length === 0}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
-              exporting || filteredUsers.length === 0
+            className={`flex items-center gap-2 px-3 py-2 md:px-4 md:py-2 rounded-lg border text-sm font-medium transition-colors whitespace-nowrap ${exporting || filteredUsers.length === 0
                 ? "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed"
                 : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300"
-            }`}
+              }`}
           >
             {exporting ? (
               <>
@@ -343,13 +342,13 @@ const UserMang = () => {
                 <svg className="h-4 w-4 text-[#F53F7A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M8 12l4 4m0 0l4-4m-4 4V4" />
                 </svg>
-                Export Users
+                Export
               </>
             )}
           </button>
           <button
             onClick={handleAddUser}
-            className="bg-[#F53F7A] text-white px-5 py-2 rounded-lg font-medium hover:bg-[#F53F7A]/90 transition"
+            className="bg-[#F53F7A] text-white px-4 py-2 md:px-5 md:py-2 rounded-lg font-medium hover:bg-[#F53F7A]/90 transition whitespace-nowrap flex-grow md:flex-grow-0 text-center text-sm md:text-base"
           >
             + Add New User
           </button>
@@ -425,8 +424,8 @@ const UserMang = () => {
                   <tr key={user.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
                       {user.profilePhoto ? (
-                        <img 
-                          src={user.profilePhoto} 
+                        <img
+                          src={user.profilePhoto}
                           alt={user.name}
                           className="h-10 w-10 rounded-full object-cover"
                         />
@@ -487,10 +486,10 @@ const UserMang = () => {
                 <div className="mb-4">
                   {formData.profilePhoto ? (
                     <div className="relative">
-                      <img 
-                        src={formData.profilePhoto} 
-                        alt="Profile Preview" 
-                        className="h-24 w-24 rounded-full object-cover border-4 border-white shadow-lg" 
+                      <img
+                        src={formData.profilePhoto}
+                        alt="Profile Preview"
+                        className="h-24 w-24 rounded-full object-cover border-4 border-white shadow-lg"
                       />
                       <button
                         type="button"

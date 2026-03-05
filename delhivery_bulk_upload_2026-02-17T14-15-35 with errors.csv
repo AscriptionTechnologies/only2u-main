@@ -1,0 +1,76 @@
+*Sale Order Number,*Pickup Location Name,*Customer Name,*Customer Phone,*Item Sku Code,*Item Sku Name,*Unit Item Price,Discount Type,Discount Value,Tax Class Code,*Transport Mode,*Payment Mode,*Packaging Type,COD Amount,*Quantity Ordered,Length (cm),Breadth (cm),Height (cm),Weight (gm),Weight (gm),Protect Category Id,Fragile Shipment,Customer Email,*Shipping Address Line1,Shipping Address Line2,*Shipping City,*Shipping State,*Shipping Pincode,Billing Address same as Shipping Address,Billing Address Line1,Billing Address Line2,Billing City,Billing State,Billing Pincode,E-Way Bill Number,Seller Name,Seller GST Number,Seller Address Line1,Seller Address Line2,Seller City,Seller State,Seller Pincode,ERRORS (for DLV use)
+,,,,,,,,0,54072040,,,,1899,,10,10,10,500,500,,FALSE,,,,,,,TRUE,,,,,,,Only2U,,,,,,,"*Sale Order Number: *Sale Order Number is a required field
+*Pickup Location Name: *Pickup Location Name is a required field
+*Customer Name: *Customer Name is a required field
+*Customer Phone: *Customer Phone is a required field
+*Item Sku Code: *Item Sku Code is a required field
+*Item Sku Name: *Item Sku Name is a required field
+*Unit Item Price: *Unit Item Price is a required field
+*Transport Mode: *Transport Mode is a required field
+*Payment Mode: *Payment Mode is a required field
+*Quantity Ordered: *Quantity Ordered is a required field
+*Shipping Address Line1: *Shipping Address Line1 is a required field
+*Shipping City: *Shipping City is a required field
+*Shipping State: *Shipping State is a required field
+*Shipping Pincode: *Shipping Pincode is a required field
+"
+,,,,,,,,0,62041911,,,,1699,,10,10,10,500,500,,FALSE,,,,,,,TRUE,,,,,,,Only2U,,,,,,,"*Sale Order Number: *Sale Order Number is a required field
+*Pickup Location Name: *Pickup Location Name is a required field
+*Customer Name: *Customer Name is a required field
+*Customer Phone: *Customer Phone is a required field
+*Item Sku Code: *Item Sku Code is a required field
+*Item Sku Name: *Item Sku Name is a required field
+*Unit Item Price: *Unit Item Price is a required field
+*Transport Mode: *Transport Mode is a required field
+*Payment Mode: *Payment Mode is a required field
+*Quantity Ordered: *Quantity Ordered is a required field
+*Shipping Address Line1: *Shipping Address Line1 is a required field
+*Shipping City: *Shipping City is a required field
+*Shipping State: *Shipping State is a required field
+*Shipping Pincode: *Shipping Pincode is a required field
+"
+,,,,,,,,0,,,,,0,,10,10,10,500,500,,FALSE,,,,,,,TRUE,,,,,,,Only2U,,,,,,,"*Sale Order Number: *Sale Order Number is a required field
+*Pickup Location Name: *Pickup Location Name is a required field
+*Customer Name: *Customer Name is a required field
+*Customer Phone: *Customer Phone is a required field
+*Item Sku Code: *Item Sku Code is a required field
+*Item Sku Name: *Item Sku Name is a required field
+*Unit Item Price: *Unit Item Price is a required field
+*Transport Mode: *Transport Mode is a required field
+*Payment Mode: *Payment Mode is a required field
+*Quantity Ordered: *Quantity Ordered is a required field
+*Shipping Address Line1: *Shipping Address Line1 is a required field
+*Shipping City: *Shipping City is a required field
+*Shipping State: *Shipping State is a required field
+*Shipping Pincode: *Shipping Pincode is a required field
+"
+,,,,,,,,0,,,,,1400,,10,10,10,500,500,,FALSE,,,,,,,TRUE,,,,,,,Only2U,,,,,,,"*Sale Order Number: *Sale Order Number is a required field
+*Pickup Location Name: *Pickup Location Name is a required field
+*Customer Name: *Customer Name is a required field
+*Customer Phone: *Customer Phone is a required field
+*Item Sku Code: *Item Sku Code is a required field
+*Item Sku Name: *Item Sku Name is a required field
+*Unit Item Price: *Unit Item Price is a required field
+*Transport Mode: *Transport Mode is a required field
+*Payment Mode: *Payment Mode is a required field
+*Quantity Ordered: *Quantity Ordered is a required field
+*Shipping Address Line1: *Shipping Address Line1 is a required field
+*Shipping City: *Shipping City is a required field
+*Shipping State: *Shipping State is a required field
+*Shipping Pincode: *Shipping Pincode is a required field
+"
+,,,,,,,,0,,,,,1400,,10,10,10,500,500,,FALSE,,,,,,,TRUE,,,,,,,Only2U,,,,,,,"*Sale Order Number: *Sale Order Number is a required field
+*Pickup Location Name: *Pickup Location Name is a required field
+*Customer Name: *Customer Name is a required field
+*Customer Phone: *Customer Phone is a required field
+*Item Sku Code: *Item Sku Code is a required field
+*Item Sku Name: *Item Sku Name is a required field
+*Unit Item Price: *Unit Item Price is a required field
+*Transport Mode: *Transport Mode is a required field
+*Payment Mode: *Payment Mode is a required field
+*Quantity Ordered: *Quantity Ordered is a required field
+*Shipping Address Line1: *Shipping Address Line1 is a required field
+*Shipping City: *Shipping City is a required field
+*Shipping State: *Shipping State is a required field
+*Shipping Pincode: *Shipping Pincode is a required field
+"

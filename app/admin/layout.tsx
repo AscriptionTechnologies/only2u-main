@@ -32,13 +32,20 @@ export default function Layout({ children }: LayoutProps) {
   const pageName = pageTitleMap[pageKey] || "Admin Panel";
 
   return (
-    <div className="md:flex">
-      <div className="md:w-64 w-0">
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
+      {/* Sidebar Wrapper - Hidden on mobile (width 0), visible on desktop */}
+      <div className="md:w-64 flex-shrink-0 hidden md:block">
         <Sidebar />
       </div>
-      <div className="flex-1 flex flex-col">
+
+      {/* Mobile Sidebar is handled internally by the Sidebar component using fixed positioning */}
+      <div className="md:hidden">
+        <Sidebar />
+      </div>
+
+      <div className="flex-1 flex flex-col h-full w-full overflow-hidden">
         <Header pageName={pageName} />
-        <main className="flex-1 overflow-y-auto md:p-4 py-4">{children}</main>
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 pb-20 md:pb-6">{children}</main>
       </div>
     </div>
   );

@@ -26,8 +26,11 @@ const Header = ({ pageName }: { pageName: string }) => {
   };
 
   return (
-    <header className="flex justify-between items-center px-4 py-4 bg-white border-b border-gray-200">
-      <h1 className="text-xl md:pl-0 pl-10 flex items-center gap-2 font-[SairaSemibold]"><ArrowLeft size={18} className="md:block hidden cursor-pointer" onClick={() => router.back()} /> {pageName}</h1>
+    <header className="flex justify-between items-center px-4 md:px-6 py-4 bg-white/80 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-30">
+      <h1 className="text-xl pl-12 md:pl-0 flex items-center gap-3 font-[SairaSemibold] text-gray-800">
+        <ArrowLeft size={20} className="hidden md:block cursor-pointer hover:text-[#F53F7A] transition-colors" onClick={() => router.back()} />
+        {pageName}
+      </h1>
     </header>
   );
 };

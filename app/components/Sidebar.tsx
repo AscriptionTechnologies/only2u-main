@@ -58,12 +58,7 @@ const Sidebar = () => {
       link: "/admin/CategoryManagement",
       path: "CategoryManagement",
     },
-    {
-      name: "ZIP Product Import",
-      icon: Archive,
-      link: "/admin/ZipImport",
-      path: "ZipImport",
-    },
+
     {
       name: "Fabric Management",
       icon: Palette,
@@ -157,63 +152,74 @@ const Sidebar = () => {
   const handleMenuClick = () => setIsSidebarOpen(false);
 
   return (
-    <div>
-      {/* Toggle Button for Mobile */}
-      <button
-        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-        className="md:hidden p-2 fixed top-4 left-4 z-50 bg-white shadow-lg rounded-full"
-      >
-        <Menu size={24} />
-      </button>
+    <>
+      {/* Toggle Button for Mobile - Only visible when sidebar is closed to avoid overlap */}
+      {!isSidebarOpen && (
+        <button
+          onClick={() => setIsSidebarOpen(true)}
+          className="md:hidden p-2.5 fixed top-3 left-3 z-[100] bg-white/80 backdrop-blur-md shadow-lg rounded-xl border border-gray-200/50 text-gray-700 hover:text-[#F53F7A] transition-all active:scale-95"
+          aria-label="Open Menu"
+        >
+          <Menu size={22} />
+        </button>
+      )}
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 h-full w-64 bg-white border-r border-gray-200 shadow-xl z-40 transform transition-transform duration-300 flex flex-col ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-          } md:translate-x-0`}
+        className={`fixed inset-y-0 left-0 w-72 bg-white/90 backdrop-blur-xl border-r border-gray-100 shadow-2xl z-[100] transform transition-transform duration-300 ease-out flex flex-col ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+          } md:translate-x-0 md:static md:shadow-none md:z-auto`}
       >
         {/* Close on mobile */}
-        <div
-          onClick={() => setIsSidebarOpen(false)}
-          className="md:hidden absolute top-4 right-4 cursor-pointer"
-        >
-          <X size={28} className="text-gray-700" />
+        <div className="md:hidden absolute top-4 right-4 z-[101]">
+          <button
+            onClick={() => setIsSidebarOpen(false)}
+            className="p-2 rounded-full bg-gray-50 text-gray-500 hover:bg-red-50 hover:text-red-500 transition-colors shadow-sm"
+          >
+            <X size={20} />
+          </button>
         </div>
 
         {/* Logo */}
-        <div className="p-6 border-b border-gray-100 flex items-center justify-center">
-          {/* <img src="/logo.jpg" alt="Logo" height={50} /> */}
-          <Logo />
+        <div className="h-20 flex items-center justify-center border-b border-gray-100/50">
+          <div className="scale-90 transform transition-transform hover:scale-100 duration-300">
+            <Logo />
+          </div>
         </div>
 
         {/* Navigation */}
-        <nav className="flex flex-col py-6 px-4 space-y-2 flex-1 overflow-y-auto">
+        <nav className="flex flex-col flex-1 overflow-y-auto scrollbar-hide py-6 px-4 space-y-1">
           {menuItems.map((item, index) => {
             const isActive = pageName === item.path;
+            const Icon = item.icon;
             return (
               <Link
                 key={index}
                 href={item.link}
                 onClick={handleMenuClick}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${isActive
-                  ? "bg-[#F53F7A]/10 text-[#F53F7A] font-semibold"
-                  : "text-gray-700 hover:bg-[#F53F7A]/5 hover:text-[#F53F7A]"
+                className={`group flex items-center gap-3.5 px-4 py-3.5 rounded-2xl transition-all duration-200 text-sm font-medium relative overflow-hidden ${isActive
+                  ? "bg-gradient-to-r from-[#F53F7A]/10 to-[#F53F7A]/5 text-[#F53F7A] font-semibold shadow-sm"
+                  : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
                   }`}
               >
-                <item.icon size={20} />
-                {item.name}
+                {isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 h-8 w-1 bg-[#F53F7A] rounded-r-full" />}
+                <Icon
+                  size={20}
+                  className={`transition-colors duration-200 ${isActive ? "text-[#F53F7A]" : "text-gray-400 group-hover:text-[#F53F7A]"}`}
+                />
+                <span className="relative z-10">{item.name}</span>
               </Link>
             );
           })}
         </nav>
 
         {/* Logout Button */}
-        <div className="p-6 border-t border-gray-100">
+        <div className="p-4 border-t border-gray-100/50 bg-gray-50/30">
           <button
             onClick={handleLogout}
-            className="flex items-center gap-3 text-sm text-[#F53F7A] hover:text-[#F53F7A]/80 transition w-full"
+            className="flex items-center gap-3 text-sm text-gray-500 hover:text-red-600 hover:bg-red-50/50 px-4 py-3.5 rounded-2xl transition-all w-full font-medium group"
           >
-            <LogOut size={20} />
-            Log out
+            <LogOut size={20} className="text-gray-400 group-hover:text-red-500 transition-colors" />
+            <span className="group-hover:translate-x-1 transition-transform">Log out</span>
           </button>
         </div>
       </aside>
@@ -221,11 +227,12 @@ const Sidebar = () => {
       {/* Overlay */}
       {isSidebarOpen && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-40 z-30 md:hidden"
+          className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-[90] md:hidden transition-all duration-300"
           onClick={() => setIsSidebarOpen(false)}
+          aria-hidden="true"
         />
       )}
-    </div>
+    </>
   );
 };
 

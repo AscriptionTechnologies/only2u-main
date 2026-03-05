@@ -2071,8 +2071,8 @@ function ProductFormContent() {
                             key={color.id}
                             type="button"
                             className={`w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all ${selectedColors.includes(color.id)
-                                ? "border-[#F53F7A] ring-2 ring-[#F53F7A]"
-                                : "border-gray-300 hover:border-gray-400"
+                              ? "border-[#F53F7A] ring-2 ring-[#F53F7A]"
+                              : "border-gray-300 hover:border-gray-400"
                               }`}
                             style={{ backgroundColor: color.hex_code }}
                             onClick={() => handleColorSelection(color.id)}
@@ -2130,8 +2130,8 @@ function ProductFormContent() {
                             key={size.id}
                             type="button"
                             className={`px-4 py-2 rounded-lg border transition-all ${selectedSizes.includes(size.id)
-                                ? "bg-[#F53F7A] text-white border-[#F53F7A]"
-                                : "bg-white text-gray-700 border-gray-300 hover:border-gray-400"
+                              ? "bg-[#F53F7A] text-white border-[#F53F7A]"
+                              : "bg-white text-gray-700 border-gray-300 hover:border-gray-400"
                               }`}
                             onClick={() => handleSizeSelection(size.id)}
                           >
@@ -2221,87 +2221,78 @@ function ProductFormContent() {
                             return (
                               <div
                                 key={`${variant.color_id}-${variant.size_id}`}
-                                className="border border-gray-200 rounded-lg p-3 relative"
+                                className="border border-gray-200 rounded-xl p-4 relative bg-gray-50/50 hover:bg-white hover:shadow-md transition-all duration-200"
                               >
-                                <div className="flex items-center gap-3 overflow-x-auto">
-                                  {/* Color/Size Display */}
-                                  <div className="flex items-center gap-1 flex-shrink-0">
-                                    {variant.color_id ? (
-                                      <>
-                                        <div
-                                          className="w-5 h-5 rounded-full border-2 border-gray-300"
-                                          style={{
-                                            backgroundColor: colors.find(c => c.id === variant.color_id)?.hex_code || "#ccc",
-                                          }}
-                                        ></div>
-                                        <span className="text-lg font-medium whitespace-nowrap">
+                                <div className="flex flex-col md:flex-row gap-4">
+                                  {/* Header: Color/Size & Delete Button */}
+                                  <div className="flex items-center justify-between md:w-auto md:shrink-0 text-sm">
+                                    <div className="flex items-center gap-2">
+                                      {variant.color_id ? (
+                                        <>
+                                          <div
+                                            className="w-6 h-6 rounded-full border border-gray-300 shadow-sm"
+                                            style={{
+                                              backgroundColor: colors.find(c => c.id === variant.color_id)?.hex_code || "#ccc",
+                                            }}
+                                            title={colors.find(c => c.id === variant.color_id)?.name}
+                                          ></div>
+                                          <span className="font-bold text-gray-900 text-base">
+                                            {size?.name}
+                                          </span>
+                                        </>
+                                      ) : (
+                                        <span className="font-bold text-gray-900 text-base">
                                           {size?.name}
                                         </span>
-                                      </>
-                                    ) : (
-                                      <span className="text-lg font-medium whitespace-nowrap">
-                                        {size?.name}
-                                      </span>
-                                    )}
-                                  </div>
+                                      )}
+                                    </div>
 
-                                  {/* Cross Icon */}
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      // Remove this variant by filtering it out
-                                      setVariants((prev) =>
-                                        prev.filter(
+                                    {/* Mobile Delete Button (visible only on small screens) */}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setVariants((prev) =>
+                                          prev.filter(
+                                            (v) =>
+                                              !(
+                                                v.color_id === variant.color_id &&
+                                                v.size_id === variant.size_id
+                                              )
+                                          )
+                                        );
+                                        const remainingVariants = variants.filter(
                                           (v) =>
                                             !(
                                               v.color_id === variant.color_id &&
                                               v.size_id === variant.size_id
                                             )
-                                        )
-                                      );
-                                      // Also remove from selected colors/sizes if no other variants use them
-                                      const remainingVariants = variants.filter(
-                                        (v) =>
-                                          !(
-                                            v.color_id === variant.color_id &&
-                                            v.size_id === variant.size_id
-                                          )
-                                      );
-                                      const usedColors = [
-                                        ...new Set(
-                                          remainingVariants.map((v) => v.color_id).filter((id): id is string => Boolean(id))
-                                        ),
-                                      ];
-                                      const usedSizes = [
-                                        ...new Set(
-                                          remainingVariants.map((v) => v.size_id)
-                                        ),
-                                      ];
-                                      setSelectedColors(usedColors);
-                                      setSelectedSizes(usedSizes);
-                                    }}
-                                    className="w-5 h-5 absolute -top-2 -right-2 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors flex-shrink-0"
-                                  >
-                                    <svg
-                                      className="w-3 h-3"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      viewBox="0 0 24 24"
+                                        );
+                                        const usedColors = [
+                                          ...new Set(
+                                            remainingVariants.map((v) => v.color_id).filter((id): id is string => Boolean(id))
+                                          ),
+                                        ];
+                                        const usedSizes = [
+                                          ...new Set(
+                                            remainingVariants.map((v) => v.size_id)
+                                          ),
+                                        ];
+                                        setSelectedColors(usedColors);
+                                        setSelectedSizes(usedSizes);
+                                      }}
+                                      className="md:hidden text-gray-400 hover:text-red-500 p-1"
                                     >
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M6 18L18 6M6 6l12 12"
-                                      />
-                                    </svg>
-                                  </button>
+                                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                      </svg>
+                                    </button>
+                                  </div>
 
-                                  {/* All inputs, images, and videos in one horizontal row */}
-                                  <div className="flex gap-3 min-w-max">
+                                  {/* Inputs Grid - Responsive */}
+                                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 flex-1">
                                     {/* Quantity */}
-                                    <div className="w-24 flex-shrink-0">
-                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-500 mb-1">
                                         Qty <span className="text-red-500">*</span>
                                       </label>
                                       <input
@@ -2318,13 +2309,13 @@ function ProductFormContent() {
                                         }
                                         min="0"
                                         placeholder="0"
-                                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent transition-shadow"
                                       />
                                     </div>
 
                                     {/* SKU */}
-                                    <div className="w-24 flex-shrink-0">
-                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                    <div className="col-span-1 sm:col-span-2 md:col-span-1">
+                                      <label className="block text-xs font-medium text-gray-500 mb-1">
                                         SKU <span className="text-red-500">*</span>
                                       </label>
                                       <input
@@ -2338,204 +2329,207 @@ function ProductFormContent() {
                                             e.target.value
                                           )
                                         }
-                                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent transition-shadow"
                                         placeholder="SKU"
                                       />
                                     </div>
 
                                     {/* MRP */}
-                                    <div className="w-20 flex-shrink-0">
-                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-500 mb-1">
                                         MRP <span className="text-red-500">*</span>
                                       </label>
-                                      <input
-                                        type="number"
-                                        inputMode="numeric"
-                                        value={variant.mrp_price === 0 ? '' : Math.round(variant.mrp_price)}
-                                        onChange={(e) => {
-                                          const mrp = parseFloat(e.target.value) || 0;
-                                          updateVariant(
-                                            variant.color_id,
-                                            variant.size_id,
-                                            "mrp_price",
-                                            mrp
-                                          );
-                                          const discount = calculateDiscountPercentage(mrp, variant.rsp_price);
-                                          updateVariant(
-                                            variant.color_id,
-                                            variant.size_id,
-                                            "discount_percentage",
-                                            discount
-                                          );
-                                        }}
-                                        step="1"
-                                        min="0"
-                                        placeholder="0"
-                                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
-                                      />
+                                      <div className="relative">
+                                        <span className="absolute left-2 top-2 text-gray-400 text-xs">₹</span>
+                                        <input
+                                          type="number"
+                                          inputMode="numeric"
+                                          value={variant.mrp_price === 0 ? '' : Math.round(variant.mrp_price)}
+                                          onChange={(e) => {
+                                            const mrp = parseFloat(e.target.value) || 0;
+                                            updateVariant(
+                                              variant.color_id,
+                                              variant.size_id,
+                                              "mrp_price",
+                                              mrp
+                                            );
+                                            const discount = calculateDiscountPercentage(mrp, variant.rsp_price);
+                                            updateVariant(
+                                              variant.color_id,
+                                              variant.size_id,
+                                              "discount_percentage",
+                                              discount
+                                            );
+                                          }}
+                                          step="1"
+                                          min="0"
+                                          placeholder="0"
+                                          className="w-full border border-gray-300 rounded-lg pl-5 pr-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent transition-shadow"
+                                        />
+                                      </div>
                                     </div>
 
                                     {/* RSP */}
-                                    <div className="w-20 flex-shrink-0">
-                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-500 mb-1">
                                         RSP <span className="text-red-500">*</span>
                                       </label>
-                                      <input
-                                        type="number"
-                                        inputMode="numeric"
-                                        value={variant.rsp_price === 0 ? '' : Math.round(variant.rsp_price)}
-                                        onChange={(e) => {
-                                          const rsp = parseFloat(e.target.value) || 0;
-                                          updateVariant(
-                                            variant.color_id,
-                                            variant.size_id,
-                                            "rsp_price",
-                                            rsp
-                                          );
-                                          updateVariant(
-                                            variant.color_id,
-                                            variant.size_id,
-                                            "price",
-                                            rsp
-                                          );
-                                          const discount = calculateDiscountPercentage(variant.mrp_price, rsp);
-                                          updateVariant(
-                                            variant.color_id,
-                                            variant.size_id,
-                                            "discount_percentage",
-                                            discount
-                                          );
-                                        }}
-                                        step="1"
-                                        min="0"
-                                        placeholder="0"
-                                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
-                                      />
+                                      <div className="relative">
+                                        <span className="absolute left-2 top-2 text-gray-400 text-xs">₹</span>
+                                        <input
+                                          type="number"
+                                          inputMode="numeric"
+                                          value={variant.rsp_price === 0 ? '' : Math.round(variant.rsp_price)}
+                                          onChange={(e) => {
+                                            const rsp = parseFloat(e.target.value) || 0;
+                                            updateVariant(
+                                              variant.color_id,
+                                              variant.size_id,
+                                              "rsp_price",
+                                              rsp
+                                            );
+                                            updateVariant(
+                                              variant.color_id,
+                                              variant.size_id,
+                                              "price",
+                                              rsp
+                                            );
+                                            const discount = calculateDiscountPercentage(variant.mrp_price, rsp);
+                                            updateVariant(
+                                              variant.color_id,
+                                              variant.size_id,
+                                              "discount_percentage",
+                                              discount
+                                            );
+                                          }}
+                                          step="1"
+                                          min="0"
+                                          placeholder="0"
+                                          className="w-full border border-gray-300 rounded-lg pl-5 pr-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent transition-shadow"
+                                        />
+                                      </div>
                                     </div>
 
                                     {/* Cost Price */}
-                                    <div className="w-20 flex-shrink-0">
-                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-500 mb-1">
                                         Cost
                                       </label>
-                                      <input
-                                        type="number"
-                                        inputMode="numeric"
-                                        value={variant.cost_price === 0 ? '' : Math.round(variant.cost_price)}
-                                        onChange={(e) =>
-                                          updateVariant(
-                                            variant.color_id,
-                                            variant.size_id,
-                                            "cost_price",
-                                            parseFloat(e.target.value) || 0
-                                          )
-                                        }
-                                        step="1"
-                                        min="0"
-                                        placeholder="0"
-                                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
-                                      />
+                                      <div className="relative">
+                                        <span className="absolute left-2 top-2 text-gray-400 text-xs">₹</span>
+                                        <input
+                                          type="number"
+                                          inputMode="numeric"
+                                          value={variant.cost_price === 0 ? '' : Math.round(variant.cost_price)}
+                                          onChange={(e) =>
+                                            updateVariant(
+                                              variant.color_id,
+                                              variant.size_id,
+                                              "cost_price",
+                                              parseFloat(e.target.value) || 0
+                                            )
+                                          }
+                                          step="1"
+                                          min="0"
+                                          placeholder="0"
+                                          className="w-full border border-gray-300 rounded-lg pl-5 pr-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent transition-shadow"
+                                        />
+                                      </div>
                                     </div>
 
                                     {/* Discount */}
-                                    <div className="w-20 flex-shrink-0">
-                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-500 mb-1">
                                         Disc %
                                       </label>
                                       <input
                                         type="number"
                                         inputMode="numeric"
                                         value={variant.discount_percentage === 0 ? '' : Math.round(variant.discount_percentage)}
-                                        onChange={(e) =>
-                                          updateVariant(
-                                            variant.color_id,
-                                            variant.size_id,
-                                            "discount_percentage",
-                                            parseFloat(e.target.value) || 0
-                                          )
-                                        }
-                                        step="1"
-                                        min="0"
-                                        max="100"
-                                        placeholder="0"
-                                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
                                         readOnly
+                                        className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-500 focus:outline-none"
                                       />
-                                    </div>
-
-                                    {/* Variant Images (display + per-variant optional upload) */}
-                                    <div className="w-80 flex-shrink-0">
-                                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                                        Images
-                                      </label>
-                                      <div className="flex gap-2 items-start">
-                                        <div className="flex gap-1 overflow-x-auto">
-                                          {variant.image_urls.map((url, idx) => (
-                                            <div key={idx} className="relative flex-shrink-0">
-                                              <img
-                                                src={url}
-                                                alt={color ? `${color.name} ${size?.name}` : `${size?.name}`}
-                                                className="h-12 w-12 rounded object-cover border"
-                                              />
-                                              <button
-                                                onClick={() => removeVariantImage(variant.color_id, variant.size_id, idx)}
-                                                className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs hover:bg-red-600"
-                                              >
-                                                ×
-                                              </button>
-                                            </div>
-                                          ))}
-                                          <label className="h-12 w-12 flex-shrink-0 flex items-center justify-center border-2 border-dashed border-gray-300 rounded text-gray-400 hover:border-[#F53F7A] hover:text-[#F53F7A] cursor-pointer">
-                                            <input
-                                              type="file"
-                                              accept="image/*"
-                                              multiple
-                                              onChange={(e) => handleVariantImageUpload(variant.color_id, variant.size_id, e)}
-                                              className="hidden"
-                                            />
-                                            {uploadingImages ? "..." : "+"}
-                                          </label>
-                                        </div>
-                                      </div>
-                                    </div>
-
-                                    {/* Variant Videos (display + per-variant optional upload) */}
-                                    <div className="w-80 flex-shrink-0">
-                                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                                        Videos
-                                      </label>
-                                      <div className="flex gap-2 items-start">
-                                        <div className="flex gap-1 overflow-x-auto">
-                                          {variant.video_urls.map((url, idx) => (
-                                            <div key={idx} className="relative flex-shrink-0">
-                                              <video
-                                                src={url}
-                                                className="h-12 w-12 rounded object-cover border"
-                                                controls
-                                              />
-                                              <button
-                                                onClick={() => removeVariantVideo(variant.color_id, variant.size_id, idx)}
-                                                className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs hover:bg-red-600"
-                                              >
-                                                ×
-                                              </button>
-                                            </div>
-                                          ))}
-                                          <label className="h-12 w-12 flex-shrink-0 flex items-center justify-center border-2 border-dashed border-gray-300 rounded text-gray-400 hover:border-[#F53F7A] hover:text-[#F53F7A] cursor-pointer">
-                                            <input
-                                              type="file"
-                                              accept="video/*"
-                                              multiple
-                                              onChange={(e) => handleVariantVideoUpload(variant.color_id, variant.size_id, e)}
-                                              className="hidden"
-                                            />
-                                            {uploadingVideos ? "..." : "+"}
-                                          </label>
-                                        </div>
-                                      </div>
                                     </div>
                                   </div>
                                 </div>
+
+                                {/* Variant Images (Full width below inputs) */}
+                                <div className="mt-4 pt-3 border-t border-gray-100">
+                                  <label className="block text-xs font-medium text-gray-500 mb-2">
+                                    Variant Specific Images {variant.color_id ? `(${colors.find(c => c.id === variant.color_id)?.name})` : ''}
+                                  </label>
+                                  <div className="flex flex-wrap gap-2">
+                                    {variant.image_urls.map((url, idx) => (
+                                      <div key={idx} className="relative group">
+                                        <img
+                                          src={url}
+                                          alt="Variant"
+                                          className="h-16 w-16 rounded-lg object-cover border border-gray-200"
+                                        />
+                                        <button
+                                          onClick={() => removeVariantImage(variant.color_id, variant.size_id, idx)}
+                                          className="absolute -top-2 -right-2 bg-white text-red-500 rounded-full w-5 h-5 flex items-center justify-center shadow-sm border border-gray-200 hover:bg-red-50 transition-colors"
+                                        >
+                                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                          </svg>
+                                        </button>
+                                      </div>
+                                    ))}
+                                    <label className="h-16 w-16 flex-shrink-0 flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg text-gray-400 hover:border-[#F53F7A] hover:text-[#F53F7A] hover:bg-[#F53F7A]/5 cursor-pointer transition-all">
+                                      <input
+                                        type="file"
+                                        accept="image/*"
+                                        multiple
+                                        onChange={(e) => handleVariantImageUpload(variant.color_id, variant.size_id, e)}
+                                        className="hidden"
+                                      />
+                                      <span className="text-xl leading-none">+</span>
+                                      <span className="text-[9px] font-medium mt-1">Add</span>
+                                    </label>
+                                  </div>
+                                </div>
+
+                                {/* Desktop Delete Button (Absolute positioned) */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setVariants((prev) =>
+                                      prev.filter(
+                                        (v) =>
+                                          !(
+                                            v.color_id === variant.color_id &&
+                                            v.size_id === variant.size_id
+                                          )
+                                      )
+                                    );
+                                    const remainingVariants = variants.filter(
+                                      (v) =>
+                                        !(
+                                          v.color_id === variant.color_id &&
+                                          v.size_id === variant.size_id
+                                        )
+                                    );
+                                    const usedColors = [
+                                      ...new Set(
+                                        remainingVariants.map((v) => v.color_id).filter((id): id is string => Boolean(id))
+                                      ),
+                                    ];
+                                    const usedSizes = [
+                                      ...new Set(
+                                        remainingVariants.map((v) => v.size_id)
+                                      ),
+                                    ];
+                                    setSelectedColors(usedColors);
+                                    setSelectedSizes(usedSizes);
+                                  }}
+                                  className="hidden md:flex absolute -top-2 -right-2 bg-white text-gray-400 border border-gray-200 rounded-full w-6 h-6 items-center justify-center hover:text-red-600 hover:border-red-200 hover:bg-red-50 shadow-sm transition-all"
+                                  title="Remove Variant"
+                                >
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
+                                </button>
                               </div>
                             );
                           })}
@@ -2920,8 +2914,8 @@ function ProductFormContent() {
                                     type="button"
                                     onClick={() => toggleReviewVerification(index)}
                                     className={`px-2 py-1 text-xs font-medium rounded transition-colors ${review.is_verified
-                                        ? "bg-green-100 text-green-700"
-                                        : "bg-gray-100 text-gray-600"
+                                      ? "bg-green-100 text-green-700"
+                                      : "bg-gray-100 text-gray-600"
                                       }`}
                                   >
                                     {review.is_verified ? "✓" : "○"}
@@ -3095,302 +3089,306 @@ function ProductFormContent() {
             </div>
           </div>
         </div>
-      </div>
+      </div >
 
       {/* Size Selection Modal */}
-      {showSizeSelectionModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-[#F53F7A] to-[#F53F7A]/90 px-6 py-4">
-              <div className="flex items-center justify-between">
+      {
+        showSizeSelectionModal && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-[#F53F7A] to-[#F53F7A]/90 px-6 py-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold text-white">
+                      Select Sizes for {pendingMediaType === 'image' ? 'Images' : 'Videos'}
+                    </h2>
+                    <p className="text-sm text-white/80 mt-1">
+                      {pendingMediaUrls.length} {pendingMediaType === 'image' ? 'image' : 'video'}(s) uploaded
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowSizeSelectionModal(false);
+                      setPendingMediaUrls([]);
+                      setSelectedSizesForMedia([]);
+                    }}
+                    className="text-white/80 hover:text-white p-1 rounded-full hover:bg-white/20 transition-colors"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="p-6">
+                {/* Media Preview */}
+                <div className="mb-6">
+                  <p className="text-sm font-medium text-gray-700 mb-3">Media to assign:</p>
+                  <div className="flex gap-2 overflow-x-auto pb-2">
+                    {pendingMediaUrls.map((url, idx) => (
+                      <div key={idx} className="flex-shrink-0">
+                        {pendingMediaType === 'image' ? (
+                          <img src={url} alt="Preview" className="h-20 w-20 rounded object-cover border-2 border-[#F53F7A]" />
+                        ) : (
+                          <video src={url} className="h-20 w-20 rounded object-cover border-2 border-purple-600" controls />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Size Selection */}
                 <div>
-                  <h2 className="text-xl font-semibold text-white">
-                    Select Sizes for {pendingMediaType === 'image' ? 'Images' : 'Videos'}
-                  </h2>
-                  <p className="text-sm text-white/80 mt-1">
-                    {pendingMediaUrls.length} {pendingMediaType === 'image' ? 'image' : 'video'}(s) uploaded
+                  <p className="text-sm font-medium text-gray-700 mb-3">
+                    Select which sizes should use this media:
                   </p>
+
+                  {/* Select All / Deselect All */}
+                  <div className="flex gap-2 mb-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Select all sizes regardless of category
+                        setSelectedSizesForMedia(sizes.map(s => s.id));
+                      }}
+                      className="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                    >
+                      Select All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSizesForMedia([])}
+                      className="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                    >
+                      Deselect All
+                    </button>
+                  </div>
+
+                  {/* Size Checkboxes */}
+                  <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-200 rounded-lg p-3 bg-gray-50">
+                    {sizes.length === 0 ? (
+                      <div className="text-center py-4 text-sm text-gray-500">
+                        No sizes available. Please add sizes in the system first.
+                      </div>
+                    ) : (
+                      [...sizes]
+                        .sort((a, b) => {
+                          const nameA = a.name.trim();
+                          const nameB = b.name.trim();
+
+                          // Comprehensive size ordering
+                          const sizeOrder = [
+                            'XXXS', 'XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL',
+                            '2XL', '3XL', '4XL', '5XL', '6XL',
+                            'ONE SIZE', 'FREE SIZE', 'OS', 'UNIVERSAL'
+                          ];
+
+                          // Check if both are in the predefined size order
+                          const upperA = nameA.toUpperCase();
+                          const upperB = nameB.toUpperCase();
+                          const indexA = sizeOrder.indexOf(upperA);
+                          const indexB = sizeOrder.indexOf(upperB);
+
+                          if (indexA !== -1 && indexB !== -1) {
+                            return indexA - indexB;
+                          }
+                          if (indexA !== -1) return -1; // A is a standard size, B is not
+                          if (indexB !== -1) return 1;  // B is a standard size, A is not
+
+                          // Check if both are purely numeric (shoe sizes, etc.)
+                          const numA = parseFloat(nameA);
+                          const numB = parseFloat(nameB);
+
+                          if (!isNaN(numA) && !isNaN(numB)) {
+                            return numA - numB;
+                          }
+
+                          // Check for numeric with suffix (e.g., "28W", "32L")
+                          const numericPrefixRegex = /^(\d+\.?\d*)/;
+                          const matchA = nameA.match(numericPrefixRegex);
+                          const matchB = nameB.match(numericPrefixRegex);
+
+                          if (matchA && matchB) {
+                            const prefixA = parseFloat(matchA[1]);
+                            const prefixB = parseFloat(matchB[1]);
+                            if (prefixA !== prefixB) {
+                              return prefixA - prefixB;
+                            }
+                            // If numeric parts are equal, compare the rest
+                            return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+                          }
+
+                          // Fallback to natural sort (handles mixed alphanumeric)
+                          return nameA.localeCompare(nameB, undefined, {
+                            numeric: true,
+                            sensitivity: 'base'
+                          });
+                        })
+                        .map((size) => {
+                          const isSelected = selectedSizesForMedia.includes(size.id);
+
+                          return (
+                            <label
+                              key={size.id}
+                              className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all ${isSelected
+                                ? 'bg-[#F53F7A] text-white'
+                                : 'bg-white hover:bg-gray-50'
+                                }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedSizesForMedia([...selectedSizesForMedia, size.id]);
+                                  } else {
+                                    setSelectedSizesForMedia(selectedSizesForMedia.filter(id => id !== size.id));
+                                  }
+                                }}
+                                className="h-5 w-5 rounded border-gray-300 text-[#F53F7A] focus:ring-[#F53F7A]"
+                              />
+                              <span className="font-medium">{size.name}</span>
+                              {selectedColors.length > 0 && (
+                                <span className={`text-xs ${isSelected ? 'text-white/80' : 'text-gray-500'}`}>
+                                  (All colors)
+                                </span>
+                              )}
+                            </label>
+                          );
+                        })
+                    )}
+                  </div>
                 </div>
-                <button
-                  onClick={() => {
-                    setShowSizeSelectionModal(false);
-                    setPendingMediaUrls([]);
-                    setSelectedSizesForMedia([]);
-                  }}
-                  className="text-white/80 hover:text-white p-1 rounded-full hover:bg-white/20 transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
 
-            {/* Content */}
-            <div className="p-6">
-              {/* Media Preview */}
-              <div className="mb-6">
-                <p className="text-sm font-medium text-gray-700 mb-3">Media to assign:</p>
-                <div className="flex gap-2 overflow-x-auto pb-2">
-                  {pendingMediaUrls.map((url, idx) => (
-                    <div key={idx} className="flex-shrink-0">
-                      {pendingMediaType === 'image' ? (
-                        <img src={url} alt="Preview" className="h-20 w-20 rounded object-cover border-2 border-[#F53F7A]" />
-                      ) : (
-                        <video src={url} className="h-20 w-20 rounded object-cover border-2 border-purple-600" controls />
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
+                {/* Selection Summary */}
+                {selectedSizesForMedia.length > 0 && (
+                  <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <p className="text-sm text-green-800">
+                      <span className="font-semibold">{selectedSizesForMedia.length}</span> size(s) selected
+                    </p>
+                  </div>
+                )}
 
-              {/* Size Selection */}
-              <div>
-                <p className="text-sm font-medium text-gray-700 mb-3">
-                  Select which sizes should use this media:
-                </p>
-
-                {/* Select All / Deselect All */}
-                <div className="flex gap-2 mb-3">
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-6 mt-6 border-t border-gray-200">
                   <button
                     type="button"
                     onClick={() => {
-                      // Select all sizes regardless of category
-                      setSelectedSizesForMedia(sizes.map(s => s.id));
+                      setShowSizeSelectionModal(false);
+                      setPendingMediaUrls([]);
+                      setSelectedSizesForMedia([]);
                     }}
-                    className="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors"
                   >
-                    Select All
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    Cancel
                   </button>
                   <button
                     type="button"
-                    onClick={() => setSelectedSizesForMedia([])}
-                    className="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                    onClick={applyMediaToSelectedSizes}
+                    disabled={selectedSizesForMedia.length === 0}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-[#F53F7A] hover:bg-[#F53F7A]/90 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Deselect All
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Assign to Selected Sizes
                   </button>
                 </div>
-
-                {/* Size Checkboxes */}
-                <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-200 rounded-lg p-3 bg-gray-50">
-                  {sizes.length === 0 ? (
-                    <div className="text-center py-4 text-sm text-gray-500">
-                      No sizes available. Please add sizes in the system first.
-                    </div>
-                  ) : (
-                    [...sizes]
-                      .sort((a, b) => {
-                        const nameA = a.name.trim();
-                        const nameB = b.name.trim();
-
-                        // Comprehensive size ordering
-                        const sizeOrder = [
-                          'XXXS', 'XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL',
-                          '2XL', '3XL', '4XL', '5XL', '6XL',
-                          'ONE SIZE', 'FREE SIZE', 'OS', 'UNIVERSAL'
-                        ];
-
-                        // Check if both are in the predefined size order
-                        const upperA = nameA.toUpperCase();
-                        const upperB = nameB.toUpperCase();
-                        const indexA = sizeOrder.indexOf(upperA);
-                        const indexB = sizeOrder.indexOf(upperB);
-
-                        if (indexA !== -1 && indexB !== -1) {
-                          return indexA - indexB;
-                        }
-                        if (indexA !== -1) return -1; // A is a standard size, B is not
-                        if (indexB !== -1) return 1;  // B is a standard size, A is not
-
-                        // Check if both are purely numeric (shoe sizes, etc.)
-                        const numA = parseFloat(nameA);
-                        const numB = parseFloat(nameB);
-
-                        if (!isNaN(numA) && !isNaN(numB)) {
-                          return numA - numB;
-                        }
-
-                        // Check for numeric with suffix (e.g., "28W", "32L")
-                        const numericPrefixRegex = /^(\d+\.?\d*)/;
-                        const matchA = nameA.match(numericPrefixRegex);
-                        const matchB = nameB.match(numericPrefixRegex);
-
-                        if (matchA && matchB) {
-                          const prefixA = parseFloat(matchA[1]);
-                          const prefixB = parseFloat(matchB[1]);
-                          if (prefixA !== prefixB) {
-                            return prefixA - prefixB;
-                          }
-                          // If numeric parts are equal, compare the rest
-                          return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
-                        }
-
-                        // Fallback to natural sort (handles mixed alphanumeric)
-                        return nameA.localeCompare(nameB, undefined, {
-                          numeric: true,
-                          sensitivity: 'base'
-                        });
-                      })
-                      .map((size) => {
-                        const isSelected = selectedSizesForMedia.includes(size.id);
-
-                        return (
-                          <label
-                            key={size.id}
-                            className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all ${isSelected
-                                ? 'bg-[#F53F7A] text-white'
-                                : 'bg-white hover:bg-gray-50'
-                              }`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setSelectedSizesForMedia([...selectedSizesForMedia, size.id]);
-                                } else {
-                                  setSelectedSizesForMedia(selectedSizesForMedia.filter(id => id !== size.id));
-                                }
-                              }}
-                              className="h-5 w-5 rounded border-gray-300 text-[#F53F7A] focus:ring-[#F53F7A]"
-                            />
-                            <span className="font-medium">{size.name}</span>
-                            {selectedColors.length > 0 && (
-                              <span className={`text-xs ${isSelected ? 'text-white/80' : 'text-gray-500'}`}>
-                                (All colors)
-                              </span>
-                            )}
-                          </label>
-                        );
-                      })
-                  )}
-                </div>
-              </div>
-
-              {/* Selection Summary */}
-              {selectedSizesForMedia.length > 0 && (
-                <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                  <p className="text-sm text-green-800">
-                    <span className="font-semibold">{selectedSizesForMedia.length}</span> size(s) selected
-                  </p>
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="flex gap-3 pt-6 mt-6 border-t border-gray-200">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowSizeSelectionModal(false);
-                    setPendingMediaUrls([]);
-                    setSelectedSizesForMedia([]);
-                  }}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={applyMediaToSelectedSizes}
-                  disabled={selectedSizesForMedia.length === 0}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-[#F53F7A] hover:bg-[#F53F7A]/90 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Assign to Selected Sizes
-                </button>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Add Color Modal */}
-      {showAddColorModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium text-gray-900">Add New Color</h3>
-              <button
-                onClick={() => setShowAddColorModal(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Color Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={newColor.name}
-                  onChange={(e) => setNewColor({ ...newColor, name: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
-                  placeholder="Enter color name"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Color Code <span className="text-red-500">*</span>
-                </label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="color"
-                    value={newColor.hex_code}
-                    onChange={(e) => setNewColor({ ...newColor, hex_code: e.target.value })}
-                    className="w-12 h-10 border border-gray-300 rounded-lg cursor-pointer"
-                  />
-                  <input
-                    type="text"
-                    value={newColor.hex_code}
-                    onChange={(e) => setNewColor({ ...newColor, hex_code: e.target.value })}
-                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
-                    placeholder="#000000"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 pt-4">
-                <button
-                  onClick={handleAddColor}
-                  disabled={addingColor}
-                  className="flex-1 bg-[#F53F7A] text-white py-2 px-4 rounded-lg hover:bg-[#F53F7A]/90 transition-colors disabled:opacity-50"
-                >
-                  {addingColor ? (
-                    <>
-                      <svg className="animate-spin w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Adding...
-                    </>
-                  ) : (
-                    'Add Color'
-                  )}
-                </button>
+      {
+        showAddColorModal && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-gray-900">Add New Color</h3>
                 <button
                   onClick={() => setShowAddColorModal(false)}
-                  className="flex-1 bg-gray-200 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors"
+                  className="text-gray-400 hover:text-gray-600"
                 >
-                  Cancel
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
                 </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Color Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newColor.name}
+                    onChange={(e) => setNewColor({ ...newColor, name: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
+                    placeholder="Enter color name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Color Code <span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      value={newColor.hex_code}
+                      onChange={(e) => setNewColor({ ...newColor, hex_code: e.target.value })}
+                      className="w-12 h-10 border border-gray-300 rounded-lg cursor-pointer"
+                    />
+                    <input
+                      type="text"
+                      value={newColor.hex_code}
+                      onChange={(e) => setNewColor({ ...newColor, hex_code: e.target.value })}
+                      className="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
+                      placeholder="#000000"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 pt-4">
+                  <button
+                    onClick={handleAddColor}
+                    disabled={addingColor}
+                    className="flex-1 bg-[#F53F7A] text-white py-2 px-4 rounded-lg hover:bg-[#F53F7A]/90 transition-colors disabled:opacity-50"
+                  >
+                    {addingColor ? (
+                      <>
+                        <svg className="animate-spin w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Adding...
+                      </>
+                    ) : (
+                      'Add Color'
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setShowAddColorModal(false)}
+                    className="flex-1 bg-gray-200 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )
+      }
+    </div >
   );
 }
 
