@@ -207,12 +207,30 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Fetch customer info from the users table
+    let customerInfo: { name?: string; email?: string; phone?: string } | undefined;
+    if (draftOrder.user_id) {
+      const { data: userData } = await supabase
+        .from('users')
+        .select('name, email, phone')
+        .eq('id', draftOrder.user_id)
+        .single();
+
+      if (userData) {
+        customerInfo = {
+          name: userData.name || undefined,
+          email: userData.email || undefined,
+          phone: userData.phone || undefined,
+        };
+      }
+    }
+
     // Sync to Shopify (non-blocking, don't fail order if sync fails)
     if (shopifyLineItems.length > 0) {
       const syncResult = await syncOrderToShopify(
         regularOrderNumber,
         shopifyLineItems,
-        undefined, // customer info not available in draft order
+        customerInfo,
         parsedShippingAddress
       );
 

@@ -787,16 +787,16 @@ export default function CategoryProducts() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <div className="flex-shrink-0 h-10 w-10">
+                          <div className="flex-shrink-0 h-20 w-20">
                             {getFirstImage(product) ? (
                               <img
-                                className="h-10 w-10 rounded-lg object-cover"
+                                className="h-20 w-20 rounded-lg object-cover"
                                 src={getFirstImage(product)!}
                                 alt={product.name}
                               />
                             ) : (
-                              <div className="h-10 w-10 rounded-lg bg-gray-200 flex items-center justify-center">
-                                <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <div className="h-20 w-20 rounded-lg bg-gray-200 flex items-center justify-center">
+                                <svg className="h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                 </svg>
                               </div>
@@ -815,8 +815,8 @@ export default function CategoryProducts() {
                         {getSmallestPrice(product) ? `₹${getSmallestPrice(product)}` : '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${product.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                          {product.is_active ? 'Active' : 'Inactive'}
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${!product.is_active && product.name.startsWith('Draft') ? 'bg-yellow-100 text-yellow-800' : product.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                          {!product.is_active && product.name.startsWith('Draft') ? 'Draft' : product.is_active ? 'Active' : 'Inactive'}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -909,9 +909,9 @@ export default function CategoryProducts() {
 
                     {/* Status Badge */}
                     <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
-                      <span className={`px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md shadow-sm ${product.is_active ? 'bg-white/90 text-green-700 backdrop-blur-sm' : 'bg-white/90 text-red-700 backdrop-blur-sm'
+                      <span className={`px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md shadow-sm ${!product.is_active && product.name.startsWith('Draft') ? 'bg-yellow-400 text-yellow-900 backdrop-blur-sm' : product.is_active ? 'bg-white/90 text-green-700 backdrop-blur-sm' : 'bg-white/90 text-red-700 backdrop-blur-sm'
                         }`}>
-                        {product.is_active ? 'Active' : 'Inactive'}
+                        {!product.is_active && product.name.startsWith('Draft') ? 'Draft' : product.is_active ? 'Active' : 'Inactive'}
                       </span>
                       {product.featured_type === 'best_seller' && (
                         <span className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md shadow-sm bg-purple-500/90 text-white backdrop-blur-sm">
@@ -968,8 +968,8 @@ export default function CategoryProducts() {
                         <button
                           onClick={() => toggleProductStatus(product)}
                           className={`p-2 rounded-lg transition-colors ${product.is_active
-                              ? 'text-gray-400 hover:text-red-600 hover:bg-red-50'
-                              : 'text-green-600 hover:bg-green-50'
+                            ? 'text-gray-400 hover:text-red-600 hover:bg-red-50'
+                            : 'text-green-600 hover:bg-green-50'
                             }`}
                           title={product.is_active ? "Deactivate" : "Activate"}
                         >

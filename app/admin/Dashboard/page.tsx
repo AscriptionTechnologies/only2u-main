@@ -17,6 +17,9 @@ export default function DashboardPage() {
     products: 0,
     orders: 0,
     productsToday: 0,
+    coinsUsed: 0,
+    coinFaceSwaps: 0,
+    coinRedemptions: 0,
   });
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [topProducts, setTopProducts] = useState<any[]>([]);
@@ -36,6 +39,13 @@ export default function DashboardPage() {
     Array<{
       sizeName: string;
       count: number;
+    }>
+  >([]);
+  const [coinBreakdown, setCoinBreakdown] = useState<
+    Array<{
+      type: string;
+      count: number;
+      totalCoins: number;
     }>
   >([]);
 
@@ -171,13 +181,14 @@ export default function DashboardPage() {
         { totalUses: 0, totalValue: 0, breakdown: [] as any[] }
       );
 
-      setStats({
+      setStats(prev => ({
+        ...prev,
         revenue,
         users: usersCount || 0,
         products: productsCount || 0,
         orders: ordersCount || 0,
         productsToday: productsTodayCount || 0,
-      });
+      }));
       setCouponStats({
         totalUses: couponAggregates.totalUses,
         totalValue: couponAggregates.totalValue,
@@ -268,6 +279,44 @@ export default function DashboardPage() {
 
       setVideoStats(videoStatsArr);
 
+      // Fetch Coin Stats
+      let coinQuery = supabase.from("coin_transactions").select("*");
+      const { data: coinData } = await applyDateFilter(coinQuery);
+
+      let faceSwaps = 0;
+      let redemptions = 0;
+      let totalCoins = 0;
+      const typeMap: Record<string, { count: number; total: number }> = {};
+
+      if (coinData) {
+        coinData.forEach((tx: any) => {
+          const type = tx.type || 'other';
+          if (type === 'face_swap') faceSwaps++;
+          if (type === 'redemption') redemptions++;
+          const amt = Math.abs(tx.amount || 0);
+          totalCoins += amt;
+
+          if (!typeMap[type]) typeMap[type] = { count: 0, total: 0 };
+          typeMap[type].count++;
+          typeMap[type].total += amt;
+        });
+      }
+
+      setCoinBreakdown(
+        Object.entries(typeMap).map(([type, data]) => ({
+          type,
+          count: data.count,
+          totalCoins: data.total,
+        })).sort((a, b) => b.totalCoins - a.totalCoins)
+      );
+
+      setStats((prev) => ({
+        ...prev,
+        coinsUsed: totalCoins,
+        coinFaceSwaps: faceSwaps,
+        coinRedemptions: redemptions,
+      }));
+
       setLoading(false);
     };
     fetchStats();
@@ -322,7 +371,9 @@ export default function DashboardPage() {
           { label: "Total Products", value: stats.products, icon: HandHeart, color: "text-green-600", bg: "bg-green-100" },
           { label: "Products Today", value: stats.productsToday, icon: TrendingUp, color: "text-blue-600", bg: "bg-blue-100" },
           { label: "Total Orders", value: stats.orders, icon: Package, color: "text-yellow-600", bg: "bg-yellow-100" },
-          { label: "Redemptions", value: couponStats.totalUses, icon: Percent, color: "text-purple-600", bg: "bg-purple-100" },
+          { label: "Coins Used", value: stats.coinsUsed.toLocaleString(), icon: TrendingUp, color: "text-orange-600", bg: "bg-orange-100" },
+          { label: "Face Swaps", value: stats.coinFaceSwaps, icon: Video, color: "text-pink-600", bg: "bg-pink-100" },
+          { label: "Coin Redemptions", value: stats.coinRedemptions, icon: Percent, color: "text-indigo-600", bg: "bg-indigo-100" },
         ].map((stat, index) => (
           <div key={index} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
             <div className="flex justify-between items-start mb-4">
@@ -530,6 +581,58 @@ export default function DashboardPage() {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="w-24 bg-gray-100 rounded-full h-1.5 overflow-hidden">
                             <div className="bg-blue-500" style={{ width: `${percentage}%`, height: '100%' }}></div>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* Coin Usage Section */}
+      <div className="grid grid-cols-1 gap-8 mb-8">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="p-6 border-b border-gray-50 bg-gray-50/30">
+            <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+              <TrendingUp className="text-orange-500" size={20} /> Coin Usage Breakdown
+            </h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-100">
+              <thead className="bg-gray-50/50">
+                <tr>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Activity Type</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Count</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Coins</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Contribution</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-50">
+                {coinBreakdown.length === 0 ? (
+                  <tr><td colSpan={4} className="text-center py-12 text-gray-400">No coin activity found in this period.</td></tr>
+                ) : (
+                  coinBreakdown.map((item) => {
+                    const totalUsed = stats.coinsUsed || 1;
+                    const percentage = (item.totalCoins / totalUsed) * 100;
+                    return (
+                      <tr key={item.type} className="hover:bg-gray-50/80 transition-colors">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="font-bold text-gray-800 uppercase text-xs tracking-wider px-2 py-1 bg-gray-100 rounded-md border border-gray-200">
+                            {item.type.replace('_', ' ')}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-700">{item.count}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-orange-600">{item.totalCoins.toLocaleString()}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-3">
+                            <div className="w-24 bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                              <div className="bg-orange-500" style={{ width: `${percentage}%`, height: '100%' }}></div>
+                            </div>
+                            <span className="text-xs text-gray-400 font-medium">{percentage.toFixed(1)}%</span>
                           </div>
                         </td>
                       </tr>

@@ -7,7 +7,7 @@ export const SUPABASE_ANON_KEY =
 
 // Browser-compatible storage for Next.js
 const getStorage = () => {
-  if (typeof window !== 'undefined') {
+  if (typeof window !== 'undefined' && window.localStorage && typeof window.localStorage.getItem === 'function') {
     return {
       getItem: (key: string) => {
         try {
