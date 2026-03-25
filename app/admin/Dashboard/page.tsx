@@ -17,15 +17,17 @@ export default function DashboardPage() {
     products: 0,
     orders: 0,
     productsToday: 0,
-    coinsUsed: 0,
-    coinFaceSwaps: 0,
-    coinRedemptions: 0,
   });
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [topProducts, setTopProducts] = useState<any[]>([]);
   const [couponStats, setCouponStats] = useState({
     totalUses: 0,
     totalValue: 0,
+  });
+  const [abandonedCarts, setAbandonedCarts] = useState({
+    count: 0,
+    potentialRevenue: 0,
+    list: [] as any[],
   });
   const [couponPerformance, setCouponPerformance] = useState<
     Array<{
@@ -41,13 +43,7 @@ export default function DashboardPage() {
       count: number;
     }>
   >([]);
-  const [coinBreakdown, setCoinBreakdown] = useState<
-    Array<{
-      type: string;
-      count: number;
-      totalCoins: number;
-    }>
-  >([]);
+  const [expandedCartId, setExpandedCartId] = useState<string | null>(null);
 
   // Date Filtering State
   const [dateRange, setDateRange] = useState<{ start: Date | null; end: Date | null }>({
@@ -181,14 +177,13 @@ export default function DashboardPage() {
         { totalUses: 0, totalValue: 0, breakdown: [] as any[] }
       );
 
-      setStats(prev => ({
-        ...prev,
+      setStats({
         revenue,
         users: usersCount || 0,
         products: productsCount || 0,
         orders: ordersCount || 0,
         productsToday: productsTodayCount || 0,
-      }));
+      });
       setCouponStats({
         totalUses: couponAggregates.totalUses,
         totalValue: couponAggregates.totalValue,
@@ -279,43 +274,65 @@ export default function DashboardPage() {
 
       setVideoStats(videoStatsArr);
 
-      // Fetch Coin Stats
-      let coinQuery = supabase.from("coin_transactions").select("*");
-      const { data: coinData } = await applyDateFilter(coinQuery);
+      // Abandoned Carts stats (Fetch all, not filtered by date range)
+      // Simple query without joins first
+      const { data: abandonedData, error: abandonedError } = await supabase
+        .from("abandoned_carts")
+        .select("*")
+        .order("abandoned_at", { ascending: false })
+        .limit(50);
 
-      let faceSwaps = 0;
-      let redemptions = 0;
-      let totalCoins = 0;
-      const typeMap: Record<string, { count: number; total: number }> = {};
-
-      if (coinData) {
-        coinData.forEach((tx: any) => {
-          const type = tx.type || 'other';
-          if (type === 'face_swap') faceSwaps++;
-          if (type === 'redemption') redemptions++;
-          const amt = Math.abs(tx.amount || 0);
-          totalCoins += amt;
-
-          if (!typeMap[type]) typeMap[type] = { count: 0, total: 0 };
-          typeMap[type].count++;
-          typeMap[type].total += amt;
-        });
+      if (abandonedError) {
+        console.error("Error fetching abandoned carts:", abandonedError);
       }
 
-      setCoinBreakdown(
-        Object.entries(typeMap).map(([type, data]) => ({
-          type,
-          count: data.count,
-          totalCoins: data.total,
-        })).sort((a, b) => b.totalCoins - a.totalCoins)
-      );
+      console.log("Abandoned carts raw data:", abandonedData);
+      console.log("Abandoned carts count:", abandonedData?.length || 0);
 
-      setStats((prev) => ({
-        ...prev,
-        coinsUsed: totalCoins,
-        coinFaceSwaps: faceSwaps,
-        coinRedemptions: redemptions,
-      }));
+      // Fetch users separately
+      let usersMap: Record<string, any> = {};
+      try {
+        const { data: usersData } = await supabase
+          .from("users")
+          .select("id, name, email, phone")
+          .limit(1000);
+        
+        usersMap = (usersData || []).reduce((acc: Record<string, any>, user: any) => {
+          acc[user.id] = user;
+          return acc;
+        }, {});
+        console.log("Users fetched:", Object.keys(usersMap).length);
+      } catch (e) {
+        console.error("Error fetching users:", e);
+      }
+
+      if (abandonedData && abandonedData.length > 0) {
+        // Merge user data with abandoned carts
+        const cartsWithUsers = abandonedData.map((cart: any) => {
+          const user = cart.user_id ? usersMap[cart.user_id] : null;
+          return {
+            ...cart,
+            user: user
+          };
+        });
+
+        // Show all abandoned carts, not just unrecovered ones
+        const activeAbandoned = cartsWithUsers.filter(c => !c.recovered);
+        const totalPotential = activeAbandoned.reduce((sum, c) => sum + (Number(c.cart_total) || 0), 0);
+
+        setAbandonedCarts({
+          count: activeAbandoned.length,
+          potentialRevenue: totalPotential,
+          list: cartsWithUsers.slice(0, 5)
+        });
+      } else {
+        console.log("No abandoned carts found");
+        setAbandonedCarts({
+          count: 0,
+          potentialRevenue: 0,
+          list: []
+        });
+      }
 
       setLoading(false);
     };
@@ -323,8 +340,14 @@ export default function DashboardPage() {
   }, [dateRange]);
 
   const handleLogout = () => {
-    localStorage.removeItem("adminId");
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem("adminId");
+    }
     router.push("/auth/Login");
+  };
+
+  const toggleCartExpansion = (cartId: string) => {
+    setExpandedCartId(expandedCartId === cartId ? null : cartId);
   };
 
   if (loading) {
@@ -371,9 +394,8 @@ export default function DashboardPage() {
           { label: "Total Products", value: stats.products, icon: HandHeart, color: "text-green-600", bg: "bg-green-100" },
           { label: "Products Today", value: stats.productsToday, icon: TrendingUp, color: "text-blue-600", bg: "bg-blue-100" },
           { label: "Total Orders", value: stats.orders, icon: Package, color: "text-yellow-600", bg: "bg-yellow-100" },
-          { label: "Coins Used", value: stats.coinsUsed.toLocaleString(), icon: TrendingUp, color: "text-orange-600", bg: "bg-orange-100" },
-          { label: "Face Swaps", value: stats.coinFaceSwaps, icon: Video, color: "text-pink-600", bg: "bg-pink-100" },
-          { label: "Coin Redemptions", value: stats.coinRedemptions, icon: Percent, color: "text-indigo-600", bg: "bg-indigo-100" },
+          { label: "Abandoned Carts", value: abandonedCarts.count, icon: Package, color: "text-orange-600", bg: "bg-orange-100" },
+          { label: "Redemptions", value: couponStats.totalUses, icon: Percent, color: "text-purple-600", bg: "bg-purple-100" },
         ].map((stat, index) => (
           <div key={index} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
             <div className="flex justify-between items-start mb-4">
@@ -593,51 +615,133 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Coin Usage Section */}
+      {/* Abandoned Carts Table */}
       <div className="grid grid-cols-1 gap-8 mb-8">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-6 border-b border-gray-50 bg-gray-50/30">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
+          <div className="p-6 border-b border-gray-50 flex justify-between items-center bg-gray-50/30">
             <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-              <TrendingUp className="text-orange-500" size={20} /> Coin Usage Breakdown
+              <Package className="text-orange-500" size={20} /> Recent Abandoned Carts
             </h2>
+            <div className="flex items-center gap-4">
+              <span className="text-sm font-medium text-orange-600 bg-orange-50 px-3 py-1 rounded-full border border-orange-100">
+                Potential: ₹{abandonedCarts.potentialRevenue.toLocaleString()}
+              </span>
+              <button className="text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors">View All</button>
+            </div>
           </div>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto flex-1">
             <table className="min-w-full divide-y divide-gray-100">
               <thead className="bg-gray-50/50">
                 <tr>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Activity Type</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Count</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Coins</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Contribution</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Customer</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Cart Items</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Value</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Abandoned At</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Action</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-50">
-                {coinBreakdown.length === 0 ? (
-                  <tr><td colSpan={4} className="text-center py-12 text-gray-400">No coin activity found in this period.</td></tr>
+                {abandonedCarts.list.length === 0 ? (
+                  <tr><td colSpan={6} className="text-center py-12 text-gray-400">No abandoned carts found.</td></tr>
                 ) : (
-                  coinBreakdown.map((item) => {
-                    const totalUsed = stats.coinsUsed || 1;
-                    const percentage = (item.totalCoins / totalUsed) * 100;
-                    return (
-                      <tr key={item.type} className="hover:bg-gray-50/80 transition-colors">
+                  abandonedCarts.list.map((cart) => (
+                    <React.Fragment key={cart.id}>
+                      <tr className="hover:bg-gray-50/80 transition-colors group cursor-pointer" onClick={() => toggleCartExpansion(cart.id)}>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="font-bold text-gray-800 uppercase text-xs tracking-wider px-2 py-1 bg-gray-100 rounded-md border border-gray-200">
-                            {item.type.replace('_', ' ')}
-                          </span>
+                          <div className="text-sm font-medium text-gray-900 group-hover:text-[#F53F7A] transition-colors">
+                            {cart.user?.name || cart.user?.email || "Guest User"}
+                          </div>
+                          {cart.user?.email && cart.user?.name && (
+                            <div className="text-xs text-gray-400">{cart.user.email}</div>
+                          )}
+                          {cart.user?.phone && (
+                            <div className="text-xs text-gray-500 mt-1">📞 {cart.user.phone}</div>
+                          )}
+                          {!cart.user && cart.user_id && (
+                            <div className="text-xs text-gray-400 mt-1">User ID: {cart.user_id.substring(0, 8)}...</div>
+                          )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-700">{item.count}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-orange-600">{item.totalCoins.toLocaleString()}</td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-3">
-                            <div className="w-24 bg-gray-100 rounded-full h-1.5 overflow-hidden">
-                              <div className="bg-orange-500" style={{ width: `${percentage}%`, height: '100%' }}></div>
-                            </div>
-                            <span className="text-xs text-gray-400 font-medium">{percentage.toFixed(1)}%</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-gray-700">{cart.item_count} items</span>
+                            <svg
+                              className={`w-4 h-4 text-gray-400 transition-transform ${expandedCartId === cart.id ? 'rotate-180' : ''}`}
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">₹{Number(cart.cart_total).toLocaleString()}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-400 font-medium">
+                          {cart.abandoned_at ? new Date(cart.abandoned_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : "-"}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {cart.notified_at ? (
+                            <span className="px-2 py-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-full border border-blue-100">
+                              Notified
+                            </span>
+                          ) : (
+                            <span className="px-2 py-1 text-xs font-medium text-amber-700 bg-amber-50 rounded-full border border-amber-100">
+                              Pending
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            {cart.user?.phone && (
+                              <a
+                                href={`https://wa.me/${cart.user.phone.replace(/\D/g, '')}?text=Hi ${encodeURIComponent(cart.user.name || 'there')}, we noticed you left some beautiful items in your cart. Complete your order now!`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-full text-xs font-semibold hover:bg-green-100 transition-colors"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                                </svg>
+                                WhatsApp
+                              </a>
+                            )}
                           </div>
                         </td>
                       </tr>
-                    );
-                  })
+                      {/* Expanded Cart Items Row */}
+                      {expandedCartId === cart.id && cart.cart_items && (
+                        <tr className="bg-gray-50/50">
+                          <td colSpan={6} className="px-6 py-4">
+                            <div className="space-y-3">
+                              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Cart Items:</p>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                {(Array.isArray(cart.cart_items) ? cart.cart_items : []).map((item: any, idx: number) => (
+                                  <div key={idx} className="flex items-center gap-3 bg-white p-3 rounded-lg border border-gray-100">
+                                    {item.image && (
+                                      <img
+                                        src={item.image}
+                                        alt={item.name}
+                                        className="w-12 h-12 object-cover rounded-md"
+                                      />
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
+                                      <div className="flex items-center gap-2 text-xs text-gray-500">
+                                        {item.size && <span>Size: {item.size}</span>}
+                                        {item.color && <span>Color: {item.color}</span>}
+                                        <span className="font-medium text-gray-700">₹{item.price}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  ))
                 )}
               </tbody>
             </table>

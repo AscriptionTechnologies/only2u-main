@@ -1,8 +1,112 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter, useSearchParams, usePathname } from "next/navigation";
 import { supabase } from "../../../../lib/supabase";
 import { exportToExcel } from "../../../../lib/exportUtils";
+
+// --- Hover Image Component ---
+function HoverEnlargeImage({
+  src,
+  alt,
+  className = "",
+  aspectRatio = "4/3"
+}: {
+  src: string | null;
+  alt: string;
+  className?: string;
+  aspectRatio?: string;
+}) {
+  const [isHovered, setIsHovered] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+
+  const handleMouseEnter = (e: React.MouseEvent) => {
+    setIsHovered(true);
+    updatePosition(e);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    updatePosition(e);
+  };
+
+  const updatePosition = (e: React.MouseEvent) => {
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    // Calculate position relative to viewport
+    // Image will be 25vw width, max 300px, min 200px
+    const enlargedWidth = Math.min(Math.max(viewportWidth * 0.25, 200), 300);
+    const enlargedHeight = enlargedWidth * (aspectRatio === "1/1" ? 1 : aspectRatio === "4/3" ? 0.75 : 1);
+
+    let x = e.clientX + 16; // 16px offset from cursor
+    let y = e.clientY - enlargedHeight / 2;
+
+    // Prevent going off right edge
+    if (x + enlargedWidth > viewportWidth - 16) {
+      x = e.clientX - enlargedWidth - 16;
+    }
+
+    // Prevent going off top/bottom edges
+    if (y < 16) {
+      y = 16;
+    } else if (y + enlargedHeight > viewportHeight - 16) {
+      y = viewportHeight - enlargedHeight - 16;
+    }
+
+    setPosition({ x, y });
+  };
+
+  if (!src) {
+    return (
+      <div className={`bg-gray-200 flex items-center justify-center ${className}`}>
+        <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div
+        ref={containerRef}
+        className={`relative overflow-hidden cursor-zoom-in ${className}`}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={() => setIsHovered(false)}
+        onMouseMove={handleMouseMove}
+      >
+        <img
+          src={src}
+          alt={alt}
+          className="w-full h-full object-cover"
+        />
+      </div>
+
+      {/* Enlarged Image Overlay */}
+      {isHovered && (
+        <div
+          className="fixed z-[9999] pointer-events-none animate-in fade-in zoom-in-95 duration-200"
+          style={{
+            left: position.x,
+            top: position.y,
+            width: 'clamp(200px, 25vw, 300px)',
+          }}
+        >
+          <div
+            className="bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden"
+            style={{ aspectRatio }}
+          >
+            <img
+              src={src}
+              alt={alt}
+              className="w-full h-full object-cover"
+            />
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
 
 // --- Types ---
 type Category = {
@@ -57,6 +161,11 @@ type ProductVariant = {
   };
 };
 
+type VideoCountBySize = {
+  sizeName: string;
+  videoCount: number;
+};
+
 export default function CategoryProducts() {
   const params = useParams();
   const router = useRouter();
@@ -75,6 +184,7 @@ export default function CategoryProducts() {
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">((searchParams?.get("statusFilter") as "all" | "active" | "inactive") || "all");
   const [featuredFilter, setFeaturedFilter] = useState<"all" | "best_seller" | "trending" | "none">((searchParams?.get("featuredFilter") as "all" | "best_seller" | "trending" | "none") || "all");
   const [vendorFilter, setVendorFilter] = useState<string>(searchParams?.get("vendorFilter") || "all");
+  const [videoFilter, setVideoFilter] = useState<"all" | "with_videos" | "without_videos">((searchParams?.get("videoFilter") as "all" | "with_videos" | "without_videos") || "all");
 
   const initialMinPrice = searchParams?.get("minPrice") ? Number(searchParams.get("minPrice")) : "";
   const initialMaxPrice = searchParams?.get("maxPrice") ? Number(searchParams.get("maxPrice")) : "";
@@ -102,6 +212,9 @@ export default function CategoryProducts() {
     if (vendorFilter !== "all") params.set("vendorFilter", vendorFilter);
     else params.delete("vendorFilter");
 
+    if (videoFilter !== "all") params.set("videoFilter", videoFilter);
+    else params.delete("videoFilter");
+
     if (minPrice !== "") params.set("minPrice", minPrice.toString());
     else params.delete("minPrice");
 
@@ -109,13 +222,14 @@ export default function CategoryProducts() {
     else params.delete("maxPrice");
 
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-  }, [searchSku, statusFilter, featuredFilter, vendorFilter, minPrice, maxPrice, pathname, router, searchParams]);
+  }, [searchSku, statusFilter, featuredFilter, vendorFilter, videoFilter, minPrice, maxPrice, pathname, router, searchParams]);
 
   const hasActiveFilters =
     searchSku.trim() ||
     statusFilter !== "all" ||
     featuredFilter !== "all" ||
     vendorFilter !== "all" ||
+    videoFilter !== "all" ||
     minPrice !== "" ||
     maxPrice !== "";
 
@@ -124,6 +238,7 @@ export default function CategoryProducts() {
     setStatusFilter("all");
     setFeaturedFilter("all");
     setVendorFilter("all");
+    setVideoFilter("all");
     setMinPrice("");
     setMaxPrice("");
   };
@@ -297,6 +412,50 @@ export default function CategoryProducts() {
     return product.variants[0].sku || "-";
   };
 
+  // Helper to get video counts by size for a product
+  const getVideoCountsBySize = (product: Product): VideoCountBySize[] => {
+    if (!product.variants || product.variants.length === 0) {
+      return [];
+    }
+
+    const sizeVideoMap: Map<string, number> = new Map();
+
+    product.variants.forEach((variant) => {
+      const sizeName = variant.size?.name || "Unknown";
+      const videoCount = variant.video_urls?.length || 0;
+
+      sizeVideoMap.set(
+        sizeName,
+        (sizeVideoMap.get(sizeName) || 0) + videoCount
+      );
+    });
+
+    return Array.from(sizeVideoMap.entries())
+      .map(([sizeName, videoCount]) => ({ sizeName, videoCount }))
+      .sort((a, b) => a.sizeName.localeCompare(b.sizeName));
+  };
+
+  // Helper to check if product has any videos
+  const hasVideos = (product: Product): boolean => {
+    if (!product.variants || product.variants.length === 0) {
+      return false;
+    }
+    return product.variants.some(
+      (variant) => variant.video_urls && variant.video_urls.length > 0
+    );
+  };
+
+  // Helper to get total video count for a product
+  const getTotalVideoCount = (product: Product): number => {
+    if (!product.variants || product.variants.length === 0) {
+      return 0;
+    }
+    return product.variants.reduce(
+      (sum, variant) => sum + (variant.video_urls?.length || 0),
+      0
+    );
+  };
+
   const filteredProducts = products.filter((product) => {
     if (searchSku.trim()) {
       const lookup = searchSku.trim().toLowerCase();
@@ -326,6 +485,16 @@ export default function CategoryProducts() {
 
     if (vendorFilter !== "all") {
       if (product.vendor_id !== vendorFilter) {
+        return false;
+      }
+    }
+
+    if (videoFilter !== "all") {
+      const productHasVideos = hasVideos(product);
+      if (videoFilter === "with_videos" && !productHasVideos) {
+        return false;
+      }
+      if (videoFilter === "without_videos" && productHasVideos) {
         return false;
       }
     }
@@ -700,6 +869,28 @@ export default function CategoryProducts() {
                   </div>
                 </div>
 
+                <div className="min-w-[180px]">
+                  <label className="block text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">
+                    Videos
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={videoFilter}
+                      onChange={(e) => setVideoFilter(e.target.value as typeof videoFilter)}
+                      className="w-full appearance-none rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm focus:border-[#F53F7A] focus:ring-2 focus:ring-[#F53F7A]/20 transition-all"
+                    >
+                      <option value="all">All Products</option>
+                      <option value="with_videos">With Videos</option>
+                      <option value="without_videos">Without Videos</option>
+                    </select>
+                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-400">
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </span>
+                  </div>
+                </div>
+
                 <div className="min-w-[220px]">
                   <label className="block text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">
                     Price Range (₹)
@@ -765,6 +956,9 @@ export default function CategoryProducts() {
                     Vendor
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Videos
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Featured
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -775,7 +969,7 @@ export default function CategoryProducts() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredProducts.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-6 py-10 text-center text-gray-500">
+                    <td colSpan={9} className="px-6 py-10 text-center text-gray-500">
                       No products match the current filters.
                     </td>
                   </tr>
@@ -787,20 +981,13 @@ export default function CategoryProducts() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <div className="flex-shrink-0 h-20 w-20">
-                            {getFirstImage(product) ? (
-                              <img
-                                className="h-20 w-20 rounded-lg object-cover"
-                                src={getFirstImage(product)!}
-                                alt={product.name}
-                              />
-                            ) : (
-                              <div className="h-20 w-20 rounded-lg bg-gray-200 flex items-center justify-center">
-                                <svg className="h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                </svg>
-                              </div>
-                            )}
+                          <div className="flex-shrink-0 h-10 w-10">
+                            <HoverEnlargeImage
+                              src={getFirstImage(product)}
+                              alt={product.name}
+                              className="h-10 w-10 rounded-lg"
+                              aspectRatio="1/1"
+                            />
                           </div>
                           <div className="ml-4">
                             <div className="text-sm font-medium text-gray-900">{product.name}</div>
@@ -815,12 +1002,44 @@ export default function CategoryProducts() {
                         {getSmallestPrice(product) ? `₹${getSmallestPrice(product)}` : '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${!product.is_active && product.name.startsWith('Draft') ? 'bg-yellow-100 text-yellow-800' : product.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                          {!product.is_active && product.name.startsWith('Draft') ? 'Draft' : product.is_active ? 'Active' : 'Inactive'}
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${product.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                          {product.is_active ? 'Active' : 'Inactive'}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {product.vendor_name || '-'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {(() => {
+                          const videoCounts = getVideoCountsBySize(product);
+                          const totalVideos = getTotalVideoCount(product);
+                          if (totalVideos === 0) {
+                            return <span className="text-gray-400 text-sm">-</span>;
+                          }
+                          return (
+                            <div className="group relative">
+                              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-700 cursor-help">
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                {totalVideos} video{totalVideos !== 1 ? 's' : ''}
+                              </span>
+                              {/* Tooltip */}
+                              <div className="absolute left-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 p-3 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+                                <p className="text-xs font-semibold text-gray-700 mb-2">Videos by Size:</p>
+                                <div className="space-y-1">
+                                  {videoCounts.map(({ sizeName, videoCount }) => (
+                                    <div key={sizeName} className="flex justify-between text-xs">
+                                      <span className="text-gray-600">{sizeName}:</span>
+                                      <span className="font-medium text-orange-600">{videoCount} video{videoCount !== 1 ? 's' : ''}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {product.featured_type === 'best_seller' && (
@@ -893,25 +1112,18 @@ export default function CategoryProducts() {
                 >
                   {/* Product Image & Badge */}
                   <div className="relative aspect-[4/3] bg-gray-100 overflow-hidden">
-                    {getFirstImage(product) ? (
-                      <img
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        src={getFirstImage(product)!}
-                        alt={product.name}
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-300">
-                        <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                      </div>
-                    )}
+                    <HoverEnlargeImage
+                      src={getFirstImage(product)}
+                      alt={product.name}
+                      className="w-full h-full"
+                      aspectRatio="4/3"
+                    />
 
                     {/* Status Badge */}
                     <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
-                      <span className={`px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md shadow-sm ${!product.is_active && product.name.startsWith('Draft') ? 'bg-yellow-400 text-yellow-900 backdrop-blur-sm' : product.is_active ? 'bg-white/90 text-green-700 backdrop-blur-sm' : 'bg-white/90 text-red-700 backdrop-blur-sm'
+                      <span className={`px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md shadow-sm ${product.is_active ? 'bg-white/90 text-green-700 backdrop-blur-sm' : 'bg-white/90 text-red-700 backdrop-blur-sm'
                         }`}>
-                        {!product.is_active && product.name.startsWith('Draft') ? 'Draft' : product.is_active ? 'Active' : 'Inactive'}
+                        {product.is_active ? 'Active' : 'Inactive'}
                       </span>
                       {product.featured_type === 'best_seller' && (
                         <span className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md shadow-sm bg-purple-500/90 text-white backdrop-blur-sm">
@@ -942,7 +1154,73 @@ export default function CategoryProducts() {
                           </span>
                         )}
                       </div>
+                      {/* Video Count */}
+                      {(() => {
+                        const videoCounts = getVideoCountsBySize(product);
+                        const totalVideos = getTotalVideoCount(product);
+                        if (totalVideos === 0) return null;
+                        return (
+                          <div className="group relative inline-block mt-1">
+                            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded cursor-help">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              {totalVideos} video{totalVideos !== 1 ? 's' : ''}
+                            </span>
+                            {/* Tooltip */}
+                            <div className="absolute left-0 bottom-full mb-2 w-44 bg-white rounded-lg shadow-lg border border-gray-200 p-3 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+                              <p className="text-xs font-semibold text-gray-700 mb-2">Videos by Size:</p>
+                              <div className="space-y-1">
+                                {videoCounts.map(({ sizeName, videoCount }) => (
+                                  <div key={sizeName} className="flex justify-between text-xs">
+                                    <span className="text-gray-600">{sizeName}:</span>
+                                    <span className="font-medium text-orange-600">{videoCount} video{videoCount !== 1 ? 's' : ''}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
+
+                    {/* Video Count Badge */}
+                    {(getTotalVideoCount(product) > 0 || videoFilter !== "all") && (
+                      <div className="mb-2">
+                        {getTotalVideoCount(product) > 0 ? (
+                          <div className="inline-flex flex-col gap-1">
+                            <div className="flex items-center gap-1.5">
+                              <svg className="w-3.5 h-3.5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
+                              </svg>
+                              <span className="text-xs font-medium text-green-600">
+                                {getTotalVideoCount(product)} videos
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {getVideoCountsBySize(product).map(({ sizeName, videoCount }) => (
+                                videoCount > 0 && (
+                                  <span
+                                    key={sizeName}
+                                    className="text-[10px] px-1.5 py-0.5 bg-green-50 text-green-700 rounded border border-green-200"
+                                  >
+                                    {sizeName}: {videoCount}
+                                  </span>
+                                )
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                            No videos
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     <div className="mt-auto pt-3 border-t border-gray-50 flex items-center justify-between">
                       <div>

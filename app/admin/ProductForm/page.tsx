@@ -4,6 +4,33 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "../../../lib/supabase";
 import { uploadFile } from "../../../lib/uploadUtils";
 
+// --- Number Input Component (No Scroll/Arrows) ---
+const NumberInput = (props: React.InputHTMLAttributes<HTMLInputElement>) => {
+  const handleWheel = (e: React.WheelEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    e.currentTarget.blur();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Prevent arrow keys from changing value
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      e.preventDefault();
+    }
+  };
+
+  return (
+    <input
+      {...props}
+      type="text"
+      inputMode="numeric"
+      pattern="[0-9]*"
+      onWheel={handleWheel}
+      onKeyDown={handleKeyDown}
+      className={`${props.className} no-spinner`}
+    />
+  );
+};
+
 // --- Types ---
 type Product = {
   id: string;
@@ -168,10 +195,6 @@ function ProductFormContent() {
   const [showAddColorModal, setShowAddColorModal] = useState(false);
   const [newColor, setNewColor] = useState({ name: "", hex_code: "#000000" });
   const [addingColor, setAddingColor] = useState(false);
-
-  // Image expansion modal state
-  const [expandedImage, setExpandedImage] = useState<string | null>(null);
-  const [expandedImageTitle, setExpandedImageTitle] = useState<string>("");
 
   // File input refs
   const videoInputRef = useRef<HTMLInputElement>(null);
@@ -2311,9 +2334,10 @@ function ProductFormContent() {
                                             parseInt(e.target.value) || 0
                                           )
                                         }
+                                        onWheel={(e) => e.currentTarget.blur()}
                                         min="0"
                                         placeholder="0"
-                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent transition-shadow"
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent transition-shadow [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                       />
                                     </div>
 
@@ -2365,10 +2389,11 @@ function ProductFormContent() {
                                               discount
                                             );
                                           }}
+                                          onWheel={(e) => e.currentTarget.blur()}
                                           step="1"
                                           min="0"
                                           placeholder="0"
-                                          className="w-full border border-gray-300 rounded-lg pl-5 pr-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent transition-shadow"
+                                          className="w-full border border-gray-300 rounded-lg pl-5 pr-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent transition-shadow [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                         />
                                       </div>
                                     </div>
@@ -2406,10 +2431,11 @@ function ProductFormContent() {
                                               discount
                                             );
                                           }}
+                                          onWheel={(e) => e.currentTarget.blur()}
                                           step="1"
                                           min="0"
                                           placeholder="0"
-                                          className="w-full border border-gray-300 rounded-lg pl-5 pr-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent transition-shadow"
+                                          className="w-full border border-gray-300 rounded-lg pl-5 pr-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent transition-shadow [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                         />
                                       </div>
                                     </div>
@@ -2433,10 +2459,11 @@ function ProductFormContent() {
                                               parseFloat(e.target.value) || 0
                                             )
                                           }
+                                          onWheel={(e) => e.currentTarget.blur()}
                                           step="1"
                                           min="0"
                                           placeholder="0"
-                                          className="w-full border border-gray-300 rounded-lg pl-5 pr-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent transition-shadow"
+                                          className="w-full border border-gray-300 rounded-lg pl-5 pr-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent transition-shadow [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                         />
                                       </div>
                                     </div>
@@ -2451,7 +2478,8 @@ function ProductFormContent() {
                                         inputMode="numeric"
                                         value={variant.discount_percentage === 0 ? '' : Math.round(variant.discount_percentage)}
                                         readOnly
-                                        className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-500 focus:outline-none"
+                                        onWheel={(e) => e.currentTarget.blur()}
+                                        className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-500 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                       />
                                     </div>
                                   </div>
@@ -2468,15 +2496,11 @@ function ProductFormContent() {
                                         <img
                                           src={url}
                                           alt="Variant"
-                                          className="h-16 w-16 rounded-lg object-cover border border-gray-200 cursor-pointer hover:opacity-80 transition-opacity"
-                                          onClick={() => {
-                                            setExpandedImage(url);
-                                            setExpandedImageTitle(`Variant: ${size?.name}${variant.color_id ? ` - ${colors.find(c => c.id === variant.color_id)?.name}` : ''}`);
-                                          }}
+                                          className="h-16 w-16 rounded-lg object-cover border border-gray-200"
                                         />
                                         <button
                                           onClick={() => removeVariantImage(variant.color_id, variant.size_id, idx)}
-                                          className="absolute -top-2 -right-2 bg-white text-red-500 rounded-full w-5 h-5 flex items-center justify-center shadow-sm border border-gray-200 hover:bg-red-50 transition-colors z-10"
+                                          className="absolute -top-2 -right-2 bg-white text-red-500 rounded-full w-5 h-5 flex items-center justify-center shadow-sm border border-gray-200 hover:bg-red-50 transition-colors"
                                         >
                                           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -2732,8 +2756,9 @@ function ProductFormContent() {
                         replacement_policy_days: e.target.value,
                       })
                     }
+                    onWheel={(e) => e.currentTarget.blur()}
                     min="0"
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     placeholder="Enter number of days for replacement policy"
                   />
                   <p className="text-xs text-gray-500 mt-1">
@@ -2779,10 +2804,11 @@ function ProductFormContent() {
                             tax_rate: e.target.value,
                           })
                         }
+                        onWheel={(e) => e.currentTarget.blur()}
                         min="0"
                         max="100"
                         step="0.01"
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent"
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#F53F7A] focus:border-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         placeholder="e.g., 18.00"
                       />
                     </div>
@@ -3396,42 +3422,27 @@ function ProductFormContent() {
           </div>
         )
       }
-
-      {/* Image Expansion Modal */}
-      {expandedImage && (
-        <div
-          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
-          onClick={() => setExpandedImage(null)}
-        >
-          <div className="relative max-w-4xl max-h-[90vh] w-full"
-          onClick={(e) => e.stopPropagation()}
-        >
-            {/* Close button */}
-            <button
-              onClick={() => setExpandedImage(null)}
-              className="absolute -top-10 right-0 text-white hover:text-gray-300 transition-colors"
-            >
-              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-
-            {/* Title */}
-            {expandedImageTitle && (
-              <p className="text-white text-sm mb-2 text-center">{expandedImageTitle}</p>
-            )}
-
-            {/* Expanded image */}
-            <img
-              src={expandedImage}
-              alt="Expanded variant"
-              className="max-w-full max-h-[80vh] mx-auto object-contain rounded-lg shadow-2xl"
-            />
-          </div>
-        </div>
-      )}
-    </div >
+    </div>
   );
+}
+
+// Inject CSS to hide number input spinners and disable scroll
+if (typeof window !== 'undefined') {
+  const style = document.createElement('style');
+  style.textContent = `
+    /* Hide number input arrows/spinners for all browsers */
+    input[type="number"]::-webkit-outer-spin-button,
+    input[type="number"]::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    
+    input[type="number"] {
+      -moz-appearance: textfield;
+      appearance: textfield;
+    }
+  `;
+  document.head.appendChild(style);
 }
 
 export default function ProductForm() {
